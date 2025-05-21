@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carleton Course Flowchart Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        #flowchart {
+            height: 600px;
+            border: 1px solid #e5e7eb;
+            position: relative;
+            overflow: visible;
+        }
+        #flowchart-canvas {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            z-index: 1;
+        }
+        .error { color: red; }
+        #courseModal, #requirementsModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+        }
+        #recenterButton {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            z-index: 10;
+            font-size: 14px;
+            padding: 6px 12px;
+        }
+        #legend {
+            position: absolute;
+            top: 40px;
+            right: 8px;
+            background: white;
+            padding: 6px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            font-size: 10px;
+            line-height: 1.4;
+            z-index: 10;
+        }
+        #legend p {
+            margin: 2px 0;
+            display: flex;
+            align-items: center;
+        }
+        #legend span {
+            width: 10px;
+            height: 10px;
+            margin-right: 4px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-6">
+    <div class="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-md">
+        <h1 class="text-2xl font-bold mb-4">Carleton Course Flowchart Generator</h1>
+        
+        <!-- Input Form -->
+        <div class="mb-6">
+            <h2 class="text-lg font-semibold mb-2">Add Course</h2>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-6">
+                <input id="courseCode" type="text" placeholder="Course Code (e.g., COMP4107)" class="border p-2 rounded">
+                <input id="prerequisites" type="text" placeholder="Prerequisites (e.g., COMP3005,COMP3007)" class="border p-2 rounded">
+                <input id="credits" type="number" step="0.5" placeholder="Credits (e.g., 0.5)" class="border p-2 rounded">
+                <select id="category" class="border p-2 rounded">
+                    <option value="program">Program (COMP, MATH, STAT)</option>
+                    <option value="breadth">Breadth Elective</option>
+                    <option value="free">Free Elective</option>
+                </select>
+                <select id="grade" class="border p-2 rounded">
+                    <option value="" disabled selected>Select Grade</option>
+                    <option value="A+">A+</option>
+                    <option value="A">A</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B">B</option>
+                    <option value="B-">B-</option>
+                    <option value="C+">C+</option>
+                    <option value="C">C</option>
+                    <option value="C-">C-</option>
+                    <option value="D+">D+</option>
+                    <option value="D">D</option>
+                    <option value="D-">D-</option>
+                    <option value="F">F</option>
+                    <option value="N/A">N/A</option>
+                </select>
+                <div class="flex items-center space-x-2">
+                    <label class="flex items-center">
+                        <input id="majorCGPA" type="checkbox" class="mr-2" checked>
+                        Major CGPA
+                    </label>
+                    <label class="flex items-center">
+                        <input id="completed" type="checkbox" class="mr-2">
+                        Completed
+                    </label>
+                </div>
+            </div>
+            <button onclick="addCourse()" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Add Course</button>
+            <p id="error" class="error hidden"></p>
+        </div>
+
+        <!-- Save/Load and Requirements Buttons -->
+        <div class="mb-4 flex gap-2">
+            <button onclick="saveCourses()" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">Save Courses</button>
+            <input type="file" id="loadCourses" accept=".json" class="hidden">
+            <button onclick="document.getElementById('loadCourses').click()" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">Load Courses</button>
+            <button onclick="openRequirementsModal()" class="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-600">Set Degree Requirements</button>
+        </div>
+
+        <!-- Credits and GPA -->
+        <div class="mb-6">
+            <div class="mt-4">
+                <p>Total Credits: <span id="currentCredits">0.0</span> / <span id="totalCreditsDisplay">20.0</span></p>
+                <div class="w-full bg-gray-200 rounded-full h-4">
+                    <div id="creditsBar" class="bg-green-500 h-4 rounded-full" style="width: 0%"></div>
+                </div>
+                <table class="mt-4 w-full border-collapse border">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="border p-2">Category</th>
+                            <th class="border p-2">Credits</th>
+                            <th class="border p-2">Required</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="border p-2">Program (COMP, MATH, STAT)</td>
+                            <td class="border p-2" id="programCredits">0.0</td>
+                            <td class="border p-2" id="programCreditsRequired">13.0</td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">Breadth Electives</td>
+                            <td class="border p-2" id="breadthCredits">0.0</td>
+                            <td class="border p-2" id="breadthCreditsRequired">3.0</td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">Free Electives</td>
+                            <td class="border p-2" id="freeCredits">0.0</td>
+                            <td class="border p-2" id="freeCreditsRequired">4.0</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="mt-2">CGPA: <span id="cgpa">0.00</span> | Major CGPA: <span id="majorCgpa">0.00</span></p>
+                <p id="creditsWarning" class="text-red-500 mt-2 hidden"></p>
+            </div>
+        </div>
+
+        <!-- Flowchart -->
+        <div id="flowchart" class="w-full">
+            <div id="flowchart-canvas"></div>
+            <button id="recenterButton" onclick="network.fit()" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Recenter Flowchart</button>
+            <div id="legend">
+                <p><span style="background-color: #3b82f6;"></span>Program</p>
+                <p><span style="background-color: #10b981;"></span>Breadth</p>
+                <p><span style="background-color: #8b5cf6;"></span>Free</p>
+                <p>Dashed = Incomplete</p>
+            </div>
+        </div>
+
+        <!-- Course Details Modal -->
+        <div id="courseModal">
+            <div class="modal-content">
+                <h2 class="text-lg font-semibold mb-4">Course Details</h2>
+                <div class="grid grid-cols-1 gap-4">
+                    <input id="modalCourseCode" type="text" disabled class="border p-2 rounded bg-gray-100">
+                    <input id="modalPrerequisites" type="text" placeholder="Prerequisites (e.g., COMP3005,COMP3007)" class="border p-2 rounded">
+                    <input id="modalCredits" type="number" step="0.5" placeholder="Credits (e.g., 0.5)" class="border p-2 rounded">
+                    <select id="modalCategory" class="border p-2 rounded">
+                        <option value="program">Program (COMP, MATH, STAT)</option>
+                        <option value="breadth">Breadth Elective</option>
+                        <option value="free">Free Elective</option>
+                    </select>
+                    <select id="modalGrade" class="border p-2 rounded">
+                        <option value="" disabled>Select Grade</option>
+                        <option value="A+">A+</option>
+                        <option value="A">A</option>
+                        <option value="A-">A-</option>
+                        <option value="B+">B+</option>
+                        <option value="B">B</option>
+                        <option value="B-">B-</option>
+                        <option value="C+">C+</option>
+                        <option value="C">C</option>
+                        <option value="C-">C-</option>
+                        <option value="D+">D+</option>
+                        <option value="D">D</option>
+                        <option value="D-">D-</option>
+                        <option value="F">F</option>
+                        <option value="N/A">N/A</option>
+                    </select>
+                    <div class="flex items-center space-x-4">
+                        <label class="flex items-center">
+                            <input id="modalMajorCGPA" type="checkbox" class="mr-2">
+                            Major CGPA
+                        </label>
+                        <label class="flex items-center">
+                            <input id="modalCompleted" type="checkbox" class="mr-2">
+                            Completed
+                        </label>
+                    </div>
+                </div>
+                <div class="mt-4 flex justify-between">
+                    <button onclick="updateCourse()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Update</button>
+                    <button onclick="deleteCourse()" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Delete</button>
+                    <button onclick="closeModal('courseModal')" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Close</button>
+                </div>
+                <p id="modalError" class="error hidden mt-2"></p>
+            </div>
+        </div>
+
+        <!-- Degree Requirements Modal -->
+        <div id="requirementsModal">
+            <div class="modal-content">
+                <h2 class="text-lg font-semibold mb-4">Set Degree Requirements</h2>
+                <div class="grid grid-cols-1 gap-4">
+                    <label class="block">
+                        <span class="text-sm font-medium text-gray-700">Total Credits Required:</span>
+                        <input id="reqTotalCredits" type="number" step="0.5" value="20.0" class="border p-2 rounded w-full mt-1">
+                    </label>
+                    <label class="block">
+                        <span class="text-sm font-medium text-gray-700">Program Credits Required:</span>
+                        <input id="reqProgramCredits" type="number" step="0.5" value="13.0" class="border p-2 rounded w-full mt-1">
+                    </label>
+                    <label class="block">
+                        <span class="text-sm font-medium text-gray-700">Breadth Credits Required:</span>
+                        <input id="reqBreadthCredits" type="number" step="0.5" value="3.0" class="border p-2 rounded w-full mt-1">
+                    </label>
+                    <label class="block">
+                        <span class="text-sm font-medium text-gray-700">Free Credits Required:</span>
+                        <input id="reqFreeCredits" type="number" step="0.5" value="4.0" class="border p-2 rounded w-full mt-1">
+                    </label>
+                </div>
+                <div class="mt-4 flex justify-between">
+                    <button onclick="updateRequirements()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Update</button>
+                    <button onclick="closeModal('requirementsModal')" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Close</button>
+                </div>
+                <p id="reqError" class="error hidden mt-2"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Course data and visualization state
+        let courses = [];
+        let nodes = new vis.DataSet([]);
+        let edges = new vis.DataSet([]);
+        let totalCreditsRequired = 20.0;
+        let programCreditsRequired = 13.0;
+        let breadthCreditsRequired = 3.0;
+        let freeCreditsRequired = 4.0;
+        let currentCredits = 0.0;
+        let programCredits = 0.0;
+        let breadthCredits = 0.0;
+        let freeCredits = 0.0;
+        let selectedCourseCode = null;
+
+        // Prohibited courses (cannot count toward degree)
+        const prohibitedCourses = [
+            'BUSI1401', 'BUSI2401', 'BUSI2402', 'BUSI3400', 'COMP1001', 'MATH1009', 'MATH1119',
+            'ECON1401', 'ECON1402', 'CGSC1005'
+        ];
+
+        // Carleton GPA scale for CGPA calculations
+        const gpaScale = {
+            'A+': 12, 'A': 11, 'A-': 10,
+            'B+': 9, 'B': 8, 'B-': 7,
+            'C+': 6, 'C': 5, 'C-': 4,
+            'D+': 3, 'D': 2, 'D-': 1,
+            'F': 0
+        };
+
+        // Initialize vis.js network for flowchart
+        const container = document.getElementById('flowchart-canvas');
+        const data = { nodes: nodes, edges: edges };
+        const options = {
+            layout: {
+                hierarchical: {
+                    direction: 'UD',
+                    sortMethod: 'directed'
+                }
+            },
+            nodes: {
+                shape: 'box',
+                font: { size: 14 }
+            },
+            edges: { arrows: 'to' }
+        };
+        const network = new vis.Network(container, data, options);
+
+        // Handle node click to show course details modal
+        network.on('click', function(params) {
+            if (params.nodes.length > 0) {
+                const courseCode = params.nodes[0];
+                selectedCourseCode = courseCode;
+                const course = courses.find(c => c.code === courseCode);
+                if (course) {
+                    document.getElementById('modalCourseCode').value = course.code;
+                    document.getElementById('modalPrerequisites').value = course.prereqs.join(',');
+                    document.getElementById('modalCredits').value = course.credits;
+                    document.getElementById('modalCategory').value = course.category;
+                    document.getElementById('modalGrade').value = course.grade || '';
+                    document.getElementById('modalMajorCGPA').checked = course.majorCGPA || false;
+                    document.getElementById('modalCompleted').checked = course.completed || false;
+                    document.getElementById('courseModal').style.display = 'flex';
+                }
+            }
+        });
+
+        // Add a new course to the list
+        function addCourse() {
+            const code = document.getElementById('courseCode').value.trim().toUpperCase();
+            const prereqs = document.getElementById('prerequisites').value.split(',').map(p => p.trim().toUpperCase()).filter(p => p);
+            const credits = parseFloat(document.getElementById('credits').value);
+            const category = document.getElementById('category').value;
+            const grade = document.getElementById('grade').value;
+            const majorCGPA = document.getElementById('majorCGPA').checked;
+            const completed = document.getElementById('completed').checked;
+            const error = document.getElementById('error');
+
+            if (!grade) {
+                error.textContent = 'Please select a grade.';
+                error.classList.remove('hidden');
+                return;
+            }
+
+            if (!validateCourse(code, prereqs, credits, category, error)) return;
+
+            error.classList.add('hidden');
+            courses.push({ code, prereqs, credits, category, grade, majorCGPA, completed });
+            updateFlowchart();
+            updateCreditsDisplay();
+            clearAddForm();
+        }
+
+        // Update an existing course
+        function updateCourse() {
+            const code = document.getElementById('modalCourseCode').value.trim().toUpperCase();
+            const prereqs = document.getElementById('modalPrerequisites').value.split(',').map(p => p.trim().toUpperCase()).filter(p => p);
+            const credits = parseFloat(document.getElementById('modalCredits').value);
+            const category = document.getElementById('modalCategory').value;
+            const grade = document.getElementById('modalGrade').value;
+            const majorCGPA = document.getElementById('modalMajorCGPA').checked;
+            const completed = document.getElementById('modalCompleted').checked;
+            const error = document.getElementById('modalError');
+
+            if (!grade) {
+                error.textContent = 'Please select a grade.';
+                error.classList.remove('hidden');
+                return;
+            }
+
+            if (!validateCourse(code, prereqs, credits, category, error, true)) return;
+
+            const index = courses.findIndex(c => c.code === selectedCourseCode);
+            if (index !== -1) {
+                courses[index] = { code, prereqs, credits, category, grade, majorCGPA, completed };
+                updateFlowchart();
+                updateCreditsDisplay();
+                closeModal('courseModal');
+            }
+        }
+
+        // Delete a course
+        function deleteCourse() {
+            courses = courses.filter(c => c.code !== selectedCourseCode);
+            updateFlowchart();
+            updateCreditsDisplay();
+            closeModal('courseModal');
+        }
+
+        // Open the degree requirements modal
+        function openRequirementsModal() {
+            document.getElementById('reqTotalCredits').value = totalCreditsRequired;
+            document.getElementById('reqProgramCredits').value = programCreditsRequired;
+            document.getElementById('reqBreadthCredits').value = breadthCreditsRequired;
+            document.getElementById('reqFreeCredits').value = freeCreditsRequired;
+            document.getElementById('requirementsModal').style.display = 'flex';
+        }
+
+        // Update degree requirements
+        function updateRequirements() {
+            const total = parseFloat(document.getElementById('reqTotalCredits').value) || 0;
+            const program = parseFloat(document.getElementById('reqProgramCredits').value) || 0;
+            const breadth = parseFloat(document.getElementById('reqBreadthCredits').value) || 0;
+            const free = parseFloat(document.getElementById('reqFreeCredits').value) || 0;
+            const error = document.getElementById('reqError');
+
+            if (total <= 0 || program < 0 || breadth < 0 || free < 0) {
+                error.textContent = 'Credits must be non-negative, and total must be positive.';
+                error.classList.remove('hidden');
+                return;
+            }
+            if (Math.abs(program + breadth + free - total) > 0.01) {
+                error.textContent = 'Program + Breadth + Free credits must equal Total credits.';
+                error.classList.remove('hidden');
+                return;
+            }
+
+            totalCreditsRequired = total;
+            programCreditsRequired = program;
+            breadthCreditsRequired = breadth;
+            freeCreditsRequired = free;
+            updateCreditsDisplay();
+            closeModal('requirementsModal');
+        }
+
+        // Close a modal
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+            document.getElementById(modalId === 'courseModal' ? 'modalError' : 'reqError').classList.add('hidden');
+            if (modalId === 'courseModal') selectedCourseCode = null;
+        }
+
+        // Validate course input
+        function validateCourse(code, prereqs, credits, category, errorElement, isUpdate = false) {
+            const courseCodeRegex = /^[A-Z]{4}\d{4}$/;
+            if (!courseCodeRegex.test(code)) {
+                errorElement.textContent = 'Invalid course code. Use format like COMP4107 (four letters, four digits).';
+                errorElement.classList.remove('hidden');
+                return false;
+            }
+            if (prohibitedCourses.includes(code)) {
+                errorElement.textContent = `${code} is a prohibited course and cannot count toward degree credits.`;
+                errorElement.classList.remove('hidden');
+                return false;
+            }
+            if (!isUpdate && courses.some(course => course.code === code)) {
+                errorElement.textContent = 'Course code already exists.';
+                errorElement.classList.remove('hidden');
+                return false;
+            }
+            if (isNaN(credits) || credits <= 0 || credits > 1.0) {
+                errorElement.textContent = 'Credits must be between 0.5 and 1.0 (e.g., 0.5 for most Carleton courses).';
+                errorElement.classList.remove('hidden');
+                return false;
+            }
+            for (let prereq of prereqs) {
+                if (prereq === code) {
+                    errorElement.textContent = 'A course cannot be a prerequisite of itself.';
+                    errorElement.classList.remove('hidden');
+                    return false;
+                }
+                if (!courseCodeRegex.test(prereq)) {
+                    errorElement.textContent = `Invalid prerequisite ${prereq}. Use format like COMP3005.`;
+                    errorElement.classList.remove('hidden');
+                    return false;
+                }
+                if (!courses.some(course => course.code === prereq) && prereq !== '' && (!isUpdate || prereq !== selectedCourseCode)) {
+                    errorElement.textContent = `Prerequisite ${prereq} not found.`;
+                    errorElement.classList.remove('hidden');
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // Update the flowchart visualization
+        function updateFlowchart() {
+            nodes.clear();
+            edges.clear();
+            const semesters = assignSemesters();
+
+            // Add nodes with category-based colors and completion status
+            courses.forEach(course => {
+                const gradeText = course.grade && course.grade !== 'N/A' ? `, ${course.grade}` : '';
+                const majorText = course.majorCGPA ? ', Major' : '';
+                let nodeStyle = {};
+                switch (course.category) {
+                    case 'program':
+                        nodeStyle = { color: { background: '#3b82f6', border: '#1e40af' } };
+                        break;
+                    case 'breadth':
+                        nodeStyle = { color: { background: '#10b981', border: '#065f46' } };
+                        break;
+                    case 'free':
+                        nodeStyle = { color: { background: '#8b5cf6', border: '#4c1d95' } };
+                        break;
+                }
+                if (!course.completed) {
+                    nodeStyle.borderDashes = [5, 5];
+                }
+                nodes.add({
+                    id: course.code,
+                    label: `${course.code}\n(${course.credits} credits${gradeText}${majorText})`,
+                    level: semesters[course.code],
+                    ...nodeStyle
+                });
+            });
+
+            // Add edges for prerequisites
+            courses.forEach(course => {
+                course.prereqs.forEach(prereq => {
+                    if (prereq) {
+                        edges.add({ from: prereq, to: course.code });
+                    }
+                });
+            });
+        }
+
+        // Assign semesters based on prerequisites
+        function assignSemesters() {
+            const semesters = {};
+            const visited = new Set();
+
+            function assign(courseCode, semester = 1) {
+                if (visited.has(courseCode)) return;
+                visited.add(courseCode);
+
+                const course = courses.find(c => c.code === courseCode);
+                if (!course) return;
+
+                let maxPrereqSemester = 0;
+                for (let prereq of course.prereqs) {
+                    if (prereq) {
+                        assign(prereq);
+                        maxPrereqSemester = Math.max(maxPrereqSemester, semesters[prereq] || 0);
+                    }
+                }
+                semesters[courseCode] = maxPrereqSemester + 1;
+            }
+
+            courses.forEach(course => assign(course.code));
+            return semesters;
+        }
+
+        // Calculate CGPA or Major CGPA
+        function calculateGPA(courses, majorOnly = false) {
+            let totalPoints = 0;
+            let totalCredits = 0;
+            courses.forEach(course => {
+                if (course.grade !== 'N/A' && (!majorOnly || course.majorCGPA)) {
+                    const points = gpaScale[course.grade] || 0;
+                    totalPoints += points * course.credits;
+                    totalCredits += course.credits;
+                }
+            });
+            return totalCredits > 0 ? (totalPoints / totalCredits).toFixed(2) : '0.00';
+        }
+
+        // Update credits and GPA display
+        function updateCreditsDisplay() {
+            programCredits = courses.reduce((sum, course) => course.category === 'program' ? sum + course.credits : sum, 0.0);
+            breadthCredits = courses.reduce((sum, course) => course.category === 'breadth' ? sum + course.credits : sum, 0.0);
+            freeCredits = courses.reduce((sum, course) => course.category === 'free' ? sum + course.credits : sum, 0.0);
+            currentCredits = programCredits + breadthCredits + freeCredits;
+
+            const max1000LevelCredits = 7.0;
+            const level1000Credits = courses.filter(c => parseInt(c.code.slice(-4)) < 2000).reduce((sum, c) => sum + c.credits, 0.0);
+
+            document.getElementById('currentCredits').textContent = currentCredits.toFixed(1);
+            document.getElementById('totalCreditsDisplay').textContent = totalCreditsRequired.toFixed(1);
+            document.getElementById('programCredits').textContent = programCredits.toFixed(1);
+            document.getElementById('breadthCredits').textContent = breadthCredits.toFixed(1);
+            document.getElementById('freeCredits').textContent = freeCredits.toFixed(1);
+            document.getElementById('programCreditsRequired').textContent = programCreditsRequired.toFixed(1);
+            document.getElementById('breadthCreditsRequired').textContent = breadthCreditsRequired.toFixed(1);
+            document.getElementById('freeCreditsRequired').textContent = freeCreditsRequired.toFixed(1);
+
+            document.getElementById('cgpa').textContent = calculateGPA(courses);
+            document.getElementById('majorCgpa').textContent = calculateGPA(courses, true);
+
+            const percentage = totalCreditsRequired ? (currentCredits / totalCreditsRequired) * 100 : 0;
+            document.getElementById('creditsBar').style.width = `${Math.min(percentage, 100)}%`;
+
+            const warnings = [];
+            if (breadthCredits > breadthCreditsRequired) {
+                warnings.push(`Breadth credits (${breadthCredits.toFixed(1)}) exceed required (${breadthCreditsRequired.toFixed(1)}).`);
+            }
+            if (programCredits < programCreditsRequired) {
+                warnings.push(`Program credits (${programCredits.toFixed(1)}) below required (${programCreditsRequired.toFixed(1)}).`);
+            }
+            if (freeCredits < freeCreditsRequired) {
+                warnings.push(`Free credits (${freeCredits.toFixed(1)}) below required (${freeCreditsRequired.toFixed(1)}).`);
+            }
+            if (level1000Credits > max1000LevelCredits) {
+                warnings.push(`1000-level credits (${level1000Credits.toFixed(1)}) exceed maximum of ${max1000LevelCredits}.`);
+            }
+
+            const warningElement = document.getElementById('creditsWarning');
+            if (warnings.length > 0) {
+                warningElement.textContent = warnings.join(' ');
+                warningElement.classList.remove('hidden');
+            } else {
+                warningElement.classList.add('hidden');
+            }
+        }
+
+        // Save courses to a JSON file
+        function saveCourses() {
+            const data = JSON.stringify(courses, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'courses.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Clear the add course form
+        function clearAddForm() {
+            document.getElementById('courseCode').value = '';
+            document.getElementById('prerequisites').value = '';
+            document.getElementById('credits').value = '';
+            document.getElementById('category').value = 'program';
+            document.getElementById('grade').value = '';
+            document.getElementById('majorCGPA').checked = true;
+            document.getElementById('completed').checked = false;
+        }
+
+        // Load courses from a JSON file
+        document.getElementById('loadCourses').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const loadedCourses = JSON.parse(e.target.result);
+                        const courseCodeRegex = /^[A-Z]{4}\d{4}$/;
+                        const validGrades = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'F', 'N/A'];
+                        const error = document.getElementById('error');
+
+                        // Validate loaded courses
+                        for (let course of loadedCourses) {
+                            if (!courseCodeRegex.test(course.code) ||
+                                prohibitedCourses.includes(course.code) ||
+                                (course.credits <= 0 || course.credits > 1.0) ||
+                                !['program', 'breadth', 'free'].includes(course.category) ||
+                                !validGrades.includes(course.grade) ||
+                                typeof course.majorCGPA !== 'boolean' ||
+                                typeof course.completed !== 'boolean') {
+                                error.textContent = `Invalid data in ${course.code}. Ensure correct format and values.`;
+                                error.classList.remove('hidden');
+                                return;
+                            }
+                            for (let prereq of course.prereqs || []) {
+                                if (!courseCodeRegex.test(prereq) || prereq === course.code) {
+                                    error.textContent = `Invalid prerequisite ${prereq} in ${course.code}.`;
+                                    error.classList.remove('hidden');
+                                    return;
+                               .Rows
+                            }
+                        }
+
+                        courses = loadedCourses;
+                        updateFlowchart();
+                        updateCreditsDisplay();
+                        error.classList.add('hidden');
+                    } catch (e) {
+                        error.textContent = 'Error loading file. Ensure it is a valid JSON file.';
+                        error.classList.remove('hidden');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // Set default Major CGPA and Completed checkboxes based on category
+        document.getElementById('category').addEventListener('change', function() {
+            document.getElementById('majorCGPA').checked = this.value === 'program';
+            document.getElementById('completed').checked = false;
+        });
+        document.getElementById('modalCategory').addEventListener('change', function() {
+            document.getElementById('modalMajorCGPA').checked = this.value === 'program';
+        });
+    </script>
+</body>
+</html>
