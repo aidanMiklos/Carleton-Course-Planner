@@ -88,7 +88,7 @@
         .error {
             color: #fc8181;
         }
-        #courseModal, #requirementsModal {
+        #courseModal, #requirementsModal, #messageBox {
             display: none;
             position: fixed;
             top: 0;
@@ -102,7 +102,7 @@
             opacity: 0;
             transition: opacity 0.3s ease;
         }
-        #courseModal.show, #requirementsModal.show {
+        #courseModal.show, #requirementsModal.show, #messageBox.show {
             display: flex !important;
             opacity: 1;
         }
@@ -117,7 +117,7 @@
             transform: translateY(-20px);
             transition: transform 0.3s ease;
         }
-        #courseModal.show .modal-content, #requirementsModal.show .modal-content {
+        #courseModal.show .modal-content, #requirementsModal.show .modal-content, #messageBox.show .modal-content {
             transform: translateY(0);
         }
         #recenterButton {
@@ -690,6 +690,14 @@
                 <p id="reqError" class="error hidden mt-2"></p>
             </div>
         </div>
+
+        <div id="messageBox">
+            <div class="modal-content">
+                <h2 class="text-lg font-semibold mb-4">Notification</h2>
+                <p id="messageBoxContent" class="mb-4 text-center"></p>
+                <button onclick="closeModal('messageBox')" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg w-full">OK</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -837,6 +845,14 @@
             document.getElementById(modalId).classList.remove('show');
             document.getElementById('modalError').classList.add('hidden');
             document.getElementById('reqError').classList.add('hidden');
+            if (modalId === 'messageBox') {
+                document.getElementById('messageBoxContent').textContent = '';
+            }
+        }
+
+        function showMessageBox(message) {
+            document.getElementById('messageBoxContent').textContent = message;
+            showModal('messageBox');
         }
 
         function autocomplete(inp, arr) {
@@ -1027,28 +1043,69 @@
 
         let draggedCourseCode = null;
         const semesterOrderMap = { 'Fall': 1, 'Winter': 2, 'Summer': 3 };
-        function getSemesterIndex(year, semester) { return parseInt(year) * 10 + semesterOrderMap[semester]; }
-        function arePrerequisitesMet(courseToCheck, targetYear, targetSemester) {
+
+        // Helper to get a comparable index for semester order
+        function getSemesterIndex(year, semester) {
+            return parseInt(year) * 10 + semesterOrderMap[semester];
+        }
+
+        // Checks if a course can be placed at a target semester based on its prerequisites
+        function canPlaceCourse(courseToCheck, targetYear, targetSemester) {
             const targetSemesterIndex = getSemesterIndex(targetYear, targetSemester);
             for (const prereqCode of courseToCheck.prereqs) {
                 const prereqCourse = courses.find(c => c.code === prereqCode);
-                if (!prereqCourse) { console.warn(`Prerequisite ${prereqCode} for ${courseToCheck.code} not found.`); continue; }
+                if (!prereqCourse) {
+                    console.warn(`Prerequisite ${prereqCode} for ${courseToCheck.code} not found.`);
+                    continue;
+                }
                 const prereqSemesterIndex = getSemesterIndex(prereqCourse.year, prereqCourse.semester);
-                if (prereqSemesterIndex >= targetSemesterIndex || !prereqCourse.completed) return false;
+                // Prerequisite must be in an earlier semester
+                if (prereqSemesterIndex >= targetSemesterIndex) {
+                    return false;
+                }
             }
             return true;
         }
+
+        // Checks if moving a course will break any *downstream* dependencies
+        function willBreakDownstreamDependencies(draggedCourseCode, newTargetYear, newTargetSemester) {
+            const newTargetSemesterIndex = getSemesterIndex(newTargetYear, newTargetSemester);
+
+            for (const course of courses) {
+                // If this course (course) has the draggedCourseCode as a prerequisite
+                if (course.prereqs.includes(draggedCourseCode)) {
+                    const dependentCourseSemesterIndex = getSemesterIndex(course.year, course.semester);
+                    // If the dependent course is currently in the same or an earlier semester than the new target for the dragged course
+                    if (dependentCourseSemesterIndex <= newTargetSemesterIndex) {
+                        return true; // This move would break a dependency
+                    }
+                }
+            }
+            return false; // No downstream dependencies would be broken
+        }
+
         function drag(event, courseCode) { draggedCourseCode = courseCode; event.dataTransfer.setData("text/plain", courseCode); event.target.classList.add('opacity-50'); }
+        
         function allowDrop(event, targetYear, targetSemester) {
             event.preventDefault(); 
             const draggedCourse = courses.find(c => c.code === draggedCourseCode);
             if (!draggedCourse) return;
-            const isValidDrop = arePrerequisitesMet(draggedCourse, targetYear, targetSemester);
+
+            // Check both conditions:
+            // 1. Can the dragged course be placed here based on its prerequisites?
+            const meetsPrerequisites = canPlaceCourse(draggedCourse, targetYear, targetSemester);
+            // 2. Will moving the dragged course here break any courses that depend on it?
+            const wontBreakDownstream = !willBreakDownstreamDependencies(draggedCourse.code, targetYear, targetSemester);
+
+            const isValidDrop = meetsPrerequisites && wontBreakDownstream;
+
             const semesterDiv = event.currentTarget;
             if (isValidDrop) { semesterDiv.classList.add('drag-over'); semesterDiv.classList.remove('drag-invalid'); } 
             else { semesterDiv.classList.add('drag-invalid'); semesterDiv.classList.remove('drag-over'); }
         }
+
         function dragLeave(event) { event.currentTarget.classList.remove('drag-over', 'drag-invalid'); }
+        
         function drop(event, targetYear, targetSemester) {
             event.preventDefault();
             const semesterDiv = event.currentTarget;
@@ -1056,10 +1113,24 @@
             const courseCode = event.dataTransfer.getData("text/plain");
             const draggedCourse = courses.find(c => c.code === courseCode);
             if (!draggedCourse) return;
-            if (arePrerequisitesMet(draggedCourse, targetYear, targetSemester)) {
+
+            // Re-check validity before actually dropping
+            const meetsPrerequisites = canPlaceCourse(draggedCourse, targetYear, targetSemester);
+            const wontBreakDownstream = !willBreakDownstreamDependencies(draggedCourse.code, targetYear, targetSemester);
+
+            if (meetsPrerequisites && wontBreakDownstream) {
                 draggedCourse.year = targetYear; draggedCourse.semester = targetSemester;
                 updateGraph(); renderSemesterView(); updateCreditSummary(); updateCGPA();
-            } else { console.warn(`Cannot move ${courseCode} to ${targetSemester} ${targetYear}. Prerequisites not met.`); }
+            } else { 
+                let errorMessage = `Cannot move ${courseCode} to ${targetSemester} ${targetYear}.`;
+                if (!meetsPrerequisites) {
+                    errorMessage += " One or more prerequisites are not met (they must be in an earlier semester).";
+                }
+                if (!wontBreakDownstream) {
+                    errorMessage += " This move would place a prerequisite after a course that depends on it.";
+                }
+                showMessageBox(errorMessage);
+            }
             draggedCourseCode = null;
             const originalDraggedElement = document.querySelector(`[ondragstart*="${courseCode}"]`);
             if (originalDraggedElement) originalDraggedElement.classList.remove('opacity-50');
