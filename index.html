@@ -463,7 +463,7 @@
                 </div>
                 <div class="select-wrapper">
                     <select id="category" class="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200">
-                        <option value="program">Program (COMP, MATH, STAT)</option>
+                        <option value="program">Program Course</option>
                         <option value="breadth">Breadth Elective</option>
                         <option value="free">Free Elective</option>
                     </select>
@@ -1332,11 +1332,8 @@
 
         function updateLegend() {
             const incompleteLegend = document.getElementById('incompleteLegend');
-            if (currentView === 'prerequisite') {
-                incompleteLegend.innerHTML = '<span style="border:2px dashed #a0aec0; background:transparent; display:inline-block; vertical-align:middle; width:12px; height:12px; margin-right:8px;"></span> = Planned';
-            } else { 
-                incompleteLegend.innerHTML = '<span style="color: #48bb78; font-weight:bold; vertical-align:middle;">&#10004;</span> = Completed';
-            }
+            incompleteLegend.innerHTML = '<span style="color: #48bb78; font-weight:bold; vertical-align:middle;">&#10004;</span> = Completed';
+            
         }
 
         function animateRecenter() {
