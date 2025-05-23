@@ -289,7 +289,7 @@
             justify-content: space-between;
             align-items: flex-start;
             transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-            cursor: pointer;
+            cursor: grab; /* Indicate draggable */
             position: relative; /* For completed checkmark */
         }
         .course-card:hover {
@@ -341,6 +341,53 @@
             text-shadow: 0 0 5px rgba(0,0,0,0.5);
         }
 
+        /* Drag and Drop styles */
+        .semester.drag-over {
+            border: 2px dashed #63b3ed;
+            background-color: #3f4a5a;
+        }
+        .semester.drag-invalid {
+            border: 2px dashed #fc8181;
+            background-color: #4a3737;
+        }
+
+        /* Autocomplete styles */
+        .autocomplete-container {
+            position: relative;
+            width: 100%;
+        }
+        .autocomplete-items {
+            position: absolute;
+            border: 1px solid #4a5568;
+            border-bottom: none;
+            border-top: none;
+            z-index: 99;
+            /*position the autocomplete items to be the same width as the container:*/
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: #2d3748;
+            border-radius: 0.5rem;
+        }
+        .autocomplete-items div {
+            padding: 10px;
+            cursor: pointer;
+            background-color: #2d3748;
+            border-bottom: 1px solid #4a5568;
+        }
+        .autocomplete-items div:hover {
+            /*when hovering an item:*/
+            background-color: #4a5568;
+        }
+        .autocomplete-active {
+            /*when navigating through the items using the arrow keys:*/
+            background-color: #4a5568 !important;
+            color: #ffffff;
+        }
+
+
         /* Responsive adjustments */
         @media (max-width: 768px) {
             .semester-row {
@@ -372,7 +419,7 @@
                 <div>
                     <input id="courseName" type="text" placeholder="Course Name" class="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200">
                 </div>
-                <div>
+                <div class="autocomplete-container">
                     <input id="prerequisites" type="text" placeholder="Prerequisites (e.g., COMP3005)" class="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200">
                 </div>
                 <div>
@@ -513,7 +560,7 @@
         </div>
 
         <div id="semesterView" class="w-full hidden">
-            <button id="toggleViewButtonSemester" onclick="toggleView()" class="absolute top-3 left-3 z-10 w-10 h-10 rounded-full bg-gray-700 text-white flex items-center justify-center shadow-md hover:bg-gray-600 transition duration-200">
+            <button id="toggleViewButtonSemester" onclick="toggleView()" class="absolute top-3 left-3 z-10 w-10 h-10 rounded-full bg-gray-700 text-white flex items-center justify-content-center shadow-md hover:bg-gray-600 transition duration-200">
                 <svg xmlns="http://www.w3.org/2000/svg" width="40" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-git-branch"><line x1="6" x2="6" y1="3" y2="15"/><path d="M18 6a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M6 18a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M6 15v3c0 1.1.9 2 2 2h4"/><path d="M18 15v3c0 1.1.9 2 2 2h-4"/></svg>
             </button>
             <div class="semester-container">
@@ -531,7 +578,7 @@
                     <div>
                         <input id="modalCourseName" type="text" placeholder="Course Name" class="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200">
                     </div>
-                    <div>
+                    <div class="autocomplete-container">
                         <input id="modalPrerequisites" type="text" placeholder="Prerequisites (e.g., COMP3005)" class="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200">
                     </div>
                     <div>
@@ -661,6 +708,7 @@
         let selectedCourseCode = null;
         let newlyAddedCourse = null;
         let currentView = 'prerequisite'; // Track current view (prerequisite or semester)
+        let stabilizationTimeoutId = null; // To store the timeout ID
 
         // Prohibited courses
         const prohibitedCourses = [
@@ -678,19 +726,20 @@
         };
 
         // Initialize vis.js network
-        const container = document.getElementById('flowchart-canvas');
+        const visContainer = document.getElementById('flowchart-canvas');
         const data = { nodes: nodes, edges: edges };
-        const options = {
+        const options = { // This is the options object used for initialization and updates
             layout: {
                 hierarchical: {
-                    direction: 'UD', // Up-Down direction
-                    sortMethod: 'directed', // Sort based on dependencies
-                    levelSeparation: 150, // Increase vertical spacing between levels
-                    nodeSpacing: 200,    // Increase horizontal spacing between nodes
-                    treeSpacing: 200,    // Spacing between trees (if multiple independent graphs)
-                    blockShifting: true, // Enable block shifting for more compact layouts
-                    edgeMinimization: true, // Attempt to minimize edge length
-                    parentCentralization: true // Keep parents central to their children
+                    enabled: true, 
+                    direction: 'UD',        
+                    sortMethod: 'directed', 
+                    levelSeparation: 150,   // Increased for more vertical space
+                    nodeSpacing: 250,      // Increased for more horizontal space
+                    treeSpacing: 250,      // Increased for better separation of independent trees
+                    blockShifting: true,
+                    edgeMinimization: true, 
+                    parentCentralization: true
                 }
             },
             nodes: {
@@ -702,9 +751,9 @@
                     highlight: { border: '#63b3ed', background: '#4c5d73' },
                     hover: { border: '#63b3ed', background: '#4c5d73' }
                 },
-                margin: 10,
+                margin: 12, 
                 shapeProperties: {
-                    borderDashes: false // Will be set dynamically
+                    borderDashes: false
                 }
             },
             edges: {
@@ -713,35 +762,55 @@
                 width: 1.5,
                 smooth: {
                     enabled: true,
-                    type: 'continuous', // Use continuous for smoother, less cluttered lines
-                    roundness: 0.6 // Adjust roundness for more "squiggly" effect
+                    type: 'cubicBezier', // Keeping cubicBezier for straighter lines
+                    roundness: 0.05      // Very low roundness for almost straight paths
                 }
             },
             physics: {
-                enabled: true,
-                barnesHut: {
-                    gravitationalConstant: -2500, // Slightly increased gravity to pull nodes closer
-                    centralGravity: 0.3,
-                    springLength: 150, // Increased spring length to spread nodes out
-                    springConstant: 0.05,
-                    damping: 0.09,
-                    avoidOverlap: 1 // Increased to strongly avoid overlap
+                enabled: true, 
+                hierarchicalRepulsion: { 
+                    centralGravity: 0.0,    
+                    springLength: 200,      // Increased for more space between connected nodes
+                    springConstant: 0.02,   // Slightly increased for stronger pull
+                    nodeDistance: 200,      // Increased to ensure good separation
+                    damping: 0.15           // Adjusted for smoother stabilization
                 },
-                solver: 'barnesHut',
+                barnesHut: { 
+                    gravitationalConstant: -1000, 
+                    centralGravity: 0.01,          
+                    springLength: 10,
+                    springConstant: 0.01,
+                    damping: 0.15,
+                    avoidOverlap: 1            
+                },
+                solver: 'hierarchicalRepulsion', 
                 stabilization: {
                     enabled: true,
-                    iterations: 1000,
-                    updateInterval: 25
+                    iterations: 1500,       
+                    updateInterval: 25,
+                    fit: true               
                 }
             }
         };
-        const network = new vis.Network(container, data, options);
+        const network = new vis.Network(visContainer, data, options);
 
-        // Handle node click to show course details modal
+        network.on("stabilizationIterationsDone", function () {
+            if (stabilizationTimeoutId) { 
+                clearTimeout(stabilizationTimeoutId);
+                stabilizationTimeoutId = null;
+            }
+            network.setOptions( { physics: false } ); // Correctly uses the global options object if needed for reference, but setOptions is the key
+            console.log("Physics disabled: Stabilization iterations done.");
+        });
+
+        network.on("stabilize", function (params) {
+            // console.log("Stabilizing...", params.iterations, "iterations");
+        });
+
         network.on('click', function(params) {
             if (params.nodes.length > 0) {
                 const courseCode = params.nodes[0];
-                if (courseCode.startsWith('year-')) return; // Ignore year nodes
+                if (courseCode.startsWith('year-')) return; 
                 selectedCourseCode = courseCode;
                 const course = courses.find(c => c.code === courseCode);
                 if (course) {
@@ -752,7 +821,7 @@
                     document.getElementById('modalCategory').value = course.category;
                     document.getElementById('modalGrade').value = course.grade;
                     document.getElementById('modalYear').value = course.year;
-                    document.getElementById('modalSemester').value = course.semester; // Set semester in modal
+                    document.getElementById('modalSemester').value = course.semester;
                     document.getElementById('modalMajorCGPA').checked = course.majorCGPA;
                     document.getElementById('modalCompleted').checked = course.completed;
                     showModal('courseModal');
@@ -760,348 +829,290 @@
             }
         });
 
-        // Function to show a modal
         function showModal(modalId) {
             document.getElementById(modalId).classList.add('show');
         }
 
-        // Function to close a modal
         function closeModal(modalId) {
             document.getElementById(modalId).classList.remove('show');
             document.getElementById('modalError').classList.add('hidden');
             document.getElementById('reqError').classList.add('hidden');
         }
 
-        // Function to add a course
+        function autocomplete(inp, arr) {
+            let currentFocus;
+            inp.addEventListener("input", function(e) {
+                let a, b, i, val = this.value;
+                closeAllLists();
+                if (!val) { return false;}
+                currentFocus = -1;
+                a = document.createElement("div");
+                a.setAttribute("id", this.id + "autocomplete-list");
+                a.setAttribute("class", "autocomplete-items");
+                this.parentNode.appendChild(a);
+                const enteredPrereqs = val.split(',').map(p => p.trim().toUpperCase().replace(/\s/g, ''));
+                const lastPrereq = enteredPrereqs[enteredPrereqs.length - 1];
+                const existingPrereqs = enteredPrereqs.slice(0, -1).join(', ');
+                for (i = 0; i < arr.length; i++) {
+                    if (arr[i].toUpperCase().includes(lastPrereq)) {
+                        b = document.createElement("div");
+                        const matchIndex = arr[i].toUpperCase().indexOf(lastPrereq);
+                        b.innerHTML = arr[i].substr(0, matchIndex) + "<strong>" + arr[i].substr(matchIndex, lastPrereq.length) + "</strong>";
+                        b.innerHTML += arr[i].substr(matchIndex + lastPrereq.length);
+                        b.innerHTML += "<input type='hidden' value='" + arr[i] + "'>";
+                        b.addEventListener("click", function(e) {
+                            const selectedValue = this.getElementsByTagName("input")[0].value;
+                            inp.value = existingPrereqs ? `${existingPrereqs}, ${selectedValue}` : selectedValue;
+                            closeAllLists();
+                        });
+                        a.appendChild(b);
+                    }
+                }
+            });
+            inp.addEventListener("keydown", function(e) {
+                let x = document.getElementById(this.id + "autocomplete-list");
+                if (x) x = x.getElementsByTagName("div");
+                if (e.keyCode == 40) { currentFocus++; addActive(x); } 
+                else if (e.keyCode == 38) { currentFocus--; addActive(x); } 
+                else if (e.keyCode == 13) { e.preventDefault(); if (currentFocus > -1) { if (x) x[currentFocus].click(); } }
+            });
+            function addActive(x) {
+                if (!x) return false;
+                removeActive(x);
+                if (currentFocus >= x.length) currentFocus = 0;
+                if (currentFocus < 0) currentFocus = (x.length - 1);
+                x[currentFocus].classList.add("autocomplete-active");
+            }
+            function removeActive(x) {
+                for (let i = 0; i < x.length; i++) { x[i].classList.remove("autocomplete-active"); }
+            }
+            function closeAllLists(elmnt) {
+                const x = document.getElementsByClassName("autocomplete-items");
+                for (let i = 0; i < x.length; i++) { if (elmnt != x[i] && elmnt != inp) { x[i].parentNode.removeChild(x[i]); } }
+            }
+            document.addEventListener("click", function (e) { closeAllLists(e.target); });
+        }
+
+        function updateAutocomplete() {
+            const courseCodes = courses.map(c => c.code);
+            autocomplete(document.getElementById("prerequisites"), courseCodes);
+            autocomplete(document.getElementById("modalPrerequisites"), courseCodes);
+        }
+
         function addCourse() {
-            const courseCode = document.getElementById('courseCode').value.toUpperCase().trim();
+            const courseCodeInput = document.getElementById('courseCode');
+            const courseCode = courseCodeInput.value.toUpperCase().trim().replace(/\s/g, '');
             const courseName = document.getElementById('courseName').value.trim();
-            const prerequisites = document.getElementById('prerequisites').value.split(',').map(p => p.trim().toUpperCase()).filter(p => p);
+            const prerequisites = document.getElementById('prerequisites').value.split(',').map(p => p.trim().toUpperCase().replace(/\s/g, '')).filter(p => p);
             const credits = parseFloat(document.getElementById('credits').value);
             const category = document.getElementById('category').value;
             const grade = document.getElementById('grade').value;
             const year = document.getElementById('year').value;
-            const semester = document.getElementById('semester').value; // Get semester
+            const semester = document.getElementById('semester').value;
             const majorCGPA = document.getElementById('majorCGPA').checked;
             const completed = document.getElementById('completed').checked;
             const errorElement = document.getElementById('error');
-
             errorElement.classList.add('hidden');
-
             if (!courseCode || !courseName || isNaN(credits) || credits <= 0 || !year || !semester) {
                 errorElement.textContent = 'Please fill in all required fields (Course Code, Name, Credits, Year, Semester).';
-                errorElement.classList.remove('hidden');
-                return;
+                errorElement.classList.remove('hidden'); return;
             }
-
             if (prohibitedCourses.includes(courseCode)) {
                 errorElement.textContent = `Course ${courseCode} is a prohibited course.`;
-                errorElement.classList.remove('hidden');
-                return;
+                errorElement.classList.remove('hidden'); return;
             }
-
             if (courses.some(c => c.code === courseCode)) {
                 errorElement.textContent = `Course with code ${courseCode} already exists.`;
-                errorElement.classList.remove('hidden');
-                return;
+                errorElement.classList.remove('hidden'); return;
             }
-
-            const newCourse = {
-                code: courseCode,
-                name: courseName,
-                prereqs: prerequisites,
-                credits: credits,
-                category: category,
-                grade: grade,
-                year: year,
-                semester: semester, // Store semester
-                majorCGPA: majorCGPA,
-                completed: completed
-            };
-
+            const newCourse = { code: courseCode, name: courseName, prereqs: prerequisites, credits: credits, category: category, grade: grade, year: year, semester: semester, majorCGPA: majorCGPA, completed: completed };
             courses.push(newCourse);
-            newlyAddedCourse = courseCode; // Store the newly added course for animation
-            updateGraph();
-            renderSemesterView(); // Re-render semester view
-            updateCreditSummary();
-            updateCGPA();
-
-            // Clear form fields
-            document.getElementById('courseCode').value = '';
-            document.getElementById('courseName').value = '';
-            document.getElementById('prerequisites').value = '';
-            document.getElementById('credits').value = '0.5';
-            document.getElementById('category').value = 'program';
-            document.getElementById('grade').value = '';
-            document.getElementById('year').value = '';
-            document.getElementById('semester').value = ''; // Clear semester
-            document.getElementById('majorCGPA').checked = true;
-            document.getElementById('completed').checked = false;
+            newlyAddedCourse = courseCode;
+            updateGraph(); renderSemesterView(); updateCreditSummary(); updateCGPA(); updateAutocomplete();
+            courseCodeInput.value = ''; document.getElementById('courseName').value = ''; document.getElementById('prerequisites').value = '';
+            document.getElementById('credits').value = '0.5'; document.getElementById('category').value = 'program';
+            document.getElementById('grade').value = ''; document.getElementById('year').value = ''; document.getElementById('semester').value = '';
+            document.getElementById('majorCGPA').checked = true; document.getElementById('completed').checked = false;
         }
 
-        // Function to update an existing course
         function updateCourse() {
             const courseCode = document.getElementById('modalCourseCode').value;
             const courseName = document.getElementById('modalCourseName').value.trim();
-            const prerequisites = document.getElementById('modalPrerequisites').value.split(',').map(p => p.trim().toUpperCase()).filter(p => p);
+            const prerequisites = document.getElementById('modalPrerequisites').value.split(',').map(p => p.trim().toUpperCase().replace(/\s/g, '')).filter(p => p);
             const credits = parseFloat(document.getElementById('modalCredits').value);
             const category = document.getElementById('modalCategory').value;
             const grade = document.getElementById('modalGrade').value;
             const year = document.getElementById('modalYear').value;
-            const semester = document.getElementById('modalSemester').value; // Get semester from modal
+            const semester = document.getElementById('modalSemester').value;
             const majorCGPA = document.getElementById('modalMajorCGPA').checked;
             const completed = document.getElementById('modalCompleted').checked;
             const errorElement = document.getElementById('modalError');
-
             errorElement.classList.add('hidden');
-
             if (!courseName || isNaN(credits) || credits <= 0 || !year || !semester) {
                 errorElement.textContent = 'Please fill in all required fields (Name, Credits, Year, Semester).';
-                errorElement.classList.remove('hidden');
-                return;
+                errorElement.classList.remove('hidden'); return;
             }
-
             const courseIndex = courses.findIndex(c => c.code === courseCode);
             if (courseIndex !== -1) {
-                courses[courseIndex].name = courseName;
-                courses[courseIndex].prereqs = prerequisites;
-                courses[courseIndex].credits = credits;
-                courses[courseIndex].category = category;
-                courses[courseIndex].grade = grade;
-                courses[courseIndex].year = year;
-                courses[courseIndex].semester = semester; // Update semester
-                courses[courseIndex].majorCGPA = majorCGPA;
-                courses[courseIndex].completed = completed;
-                updateGraph();
-                renderSemesterView(); // Re-render semester view
-                updateCreditSummary();
-                updateCGPA();
-                closeModal('courseModal');
+                courses[courseIndex] = { ...courses[courseIndex], name: courseName, prereqs: prerequisites, credits: credits, category: category, grade: grade, year: year, semester: semester, majorCGPA: majorCGPA, completed: completed };
+                updateGraph(); renderSemesterView(); updateCreditSummary(); updateCGPA(); updateAutocomplete(); closeModal('courseModal');
             }
         }
 
-        // Function to delete a course
         function deleteCourse() {
             const courseCode = document.getElementById('modalCourseCode').value;
             courses = courses.filter(c => c.code !== courseCode);
-            updateGraph();
-            renderSemesterView(); // Re-render semester view
-            updateCreditSummary();
-            updateCGPA();
-            closeModal('courseModal');
+            updateGraph(); renderSemesterView(); updateCreditSummary(); updateCGPA(); updateAutocomplete(); closeModal('courseModal');
         }
 
-        // Function to update the Vis.js graph (flowchart view)
         function updateGraph() {
-            nodes.clear();
-            edges.clear();
-
-            // Sort courses by year and then by semester for consistent layout
+            nodes.clear(); edges.clear();
+            if (stabilizationTimeoutId) { clearTimeout(stabilizationTimeoutId); stabilizationTimeoutId = null; }
+            network.setOptions( { physics: true } ); 
             const sortedCourses = [...courses].sort((a, b) => {
-                if (a.year !== b.year) {
-                    return parseInt(a.year) - parseInt(b.year);
-                }
+                if (a.year !== b.year) return parseInt(a.year) - parseInt(b.year);
                 const semesterOrder = { 'Fall': 1, 'Winter': 2, 'Summer': 3 };
                 return semesterOrder[a.semester] - semesterOrder[b.semester];
             });
-
-            // Add year nodes
             const years = [...new Set(sortedCourses.map(c => c.year))].sort((a, b) => parseInt(a) - parseInt(b));
             years.forEach(year => {
-                nodes.add({
-                    id: `year-${year}`,
-                    label: `Year ${year}`,
-                    shape: 'box',
-                    color: { background: '#4a5568', border: '#63b3ed' },
-                    font: { color: '#e2e8f0', size: 16 },
-                    group: 'years',
-                    level: (parseInt(year) * 3) - 3, // Assign level 0 for Year 1, 3 for Year 2, etc.
-                    physics: false, // Keep year nodes stable
-                });
+                nodes.add({ id: `year-${year}`, label: `Year ${year}`, shape: 'box', color: { background: '#4a5568', border: '#63b3ed' }, font: { color: '#e2e8f0', size: 16, bold: true }, group: 'years', level: (parseInt(year) * 4) - 4, physics: false });
             });
-
             sortedCourses.forEach(course => {
-                let nodeColor = '#3b82f6'; // Program
-                if (course.category === 'breadth') {
-                    nodeColor = '#10b981'; // Breadth
-                } else if (course.category === 'free') {
-                    nodeColor = '#8b5cf6'; // Free
-                }
-
-                const borderColor = course.completed ? nodeColor : '#a0aec0'; // Completed courses have solid border, incomplete have dashed
-                const borderDashes = !course.completed ? [10, 10] : false; // Make dashes more prominent
-                const borderWidth = !course.completed ? 3 : 1; // Thicker border for incomplete
-
+                let nodeColor = '#3b82f6';
+                if (course.category === 'breadth') nodeColor = '#10b981';
+                else if (course.category === 'free') nodeColor = '#8b5cf6';
+                const borderColor = course.completed ? nodeColor : '#a0aec0';
+                const borderDashes = !course.completed ? [5, 5] : false;
+                const borderWidth = !course.completed ? 2 : 1;
+                const yearBaseLevel = (parseInt(course.year) * 4) - 4;
                 let courseLevel;
                 switch (course.semester) {
-                    case 'Fall':
-                        courseLevel = (parseInt(course.year) * 3) - 2;
-                        break;
-                    case 'Winter':
-                        courseLevel = (parseInt(course.year) * 3) - 1;
-                        break;
-                    case 'Summer':
-                        courseLevel = (parseInt(course.year) * 3);
-                        break;
-                    default:
-                        courseLevel = parseInt(course.year) * 3; // Fallback
+                    case 'Fall': courseLevel = yearBaseLevel + 1; break;
+                    case 'Winter': courseLevel = yearBaseLevel + 2; break;
+                    case 'Summer': courseLevel = yearBaseLevel + 3; break;
+                    default: courseLevel = yearBaseLevel + 1;
                 }
-
-                let nodeLabel = `${course.code}\n${course.name}\n${course.credits} Credits`;
-                if (course.completed) {
-                    nodeLabel += ' ✅'; // Add checkmark to label for completed courses
-                }
-
-                nodes.add({
-                    id: course.code,
-                    label: nodeLabel,
-                    color: {
-                        background: nodeColor,
-                        border: borderColor,
-                        highlight: { border: '#63b3ed', background: nodeColor },
-                        hover: { border: '#63b3ed', background: nodeColor }
-                    },
-                    font: { color: '#ffffff' },
-                    shapeProperties: {
-                        borderDashes: borderDashes
-                    },
-                    borderWidth: borderWidth, // Apply dynamic border width
-                    group: `year-${course.year}-${course.semester}`, // Group by year and semester
-                    level: courseLevel // Assign calculated level
-                });
-
-                // Add edges for prerequisites
+                let nodeLabel = `${course.code}\n${course.name}\nGrade: ${course.grade || 'N/A'}`;
+                if (course.completed) nodeLabel += ' ✅';
+                nodes.add({ id: course.code, label: nodeLabel, color: { background: nodeColor, border: borderColor, highlight: { border: '#63b3ed', background: nodeColor }, hover: { border: '#63b3ed', background: nodeColor } }, font: { color: '#ffffff' }, shapeProperties: { borderDashes: borderDashes }, borderWidth: borderWidth, group: `year-${course.year}-${course.semester}`, level: courseLevel });
                 course.prereqs.forEach(prereqCode => {
-                    if (courses.some(c => c.code === prereqCode)) {
-                        edges.add({ from: prereqCode, to: course.code });
-                    }
+                    if (courses.some(c => c.code === prereqCode)) { edges.add({ from: prereqCode, to: course.code, arrows: 'to' }); }
                 });
-
-                // Add edge from year node to the first course of that year/semester
-                // This helps in the hierarchical layout to connect years to their respective semesters
-                const firstCourseInSemester = sortedCourses.find(
-                    c => c.year === course.year && c.semester === course.semester
-                );
-                if (firstCourseInSemester && firstCourseInSemester.code === course.code) {
-                    edges.add({
-                        from: `year-${course.year}`,
-                        to: course.code,
-                        arrows: 'to',
-                        color: { color: '#a0aec0' },
-                        dashes: true,
-                        length: 100, // Shorter length for year-to-course edges
-                        smooth: { type: 'continuous', roundness: 0.3 } // Smoother connection
-                    });
+                if (nodes.get(`year-${course.year}`)) {
+                     edges.add({ from: `year-${course.year}`, to: course.code, arrows: {to: {enabled: false}}, color: { color: '#4a5568', opacity: 0.5 }, dashes: [2,3], smooth: { type: 'cubicBezier', forceDirection: 'vertical', roundness: 0.4 }, chosen: false });
                 }
             });
-
-            // Animate newly added node
             if (newlyAddedCourse) {
-                // Find the actual DOM element for the node and apply animation
-                // This part might need more robust selection if vis.js internal structure changes
-                const nodeElement = document.querySelector(`.vis-network .vis-node[title="${newlyAddedCourse}"]`);
-                if (nodeElement) {
-                    nodeElement.classList.add('node-pop');
-                    nodeElement.addEventListener('animationend', () => {
-                        nodeElement.classList.remove('node-pop');
-                    }, { once: true });
-                }
-                newlyAddedCourse = null; // Reset
+                const nodeElement = visContainer.querySelector(`.vis-node[title*="${newlyAddedCourse}"]`);
+                if (nodeElement) { nodeElement.classList.add('node-pop'); nodeElement.addEventListener('animationend', () => nodeElement.classList.remove('node-pop'), { once: true }); }
+                network.focus(newlyAddedCourse, { animation: true, scale: 1.2 });
+                newlyAddedCourse = null;
             }
-
-            network.fit(); // Adjust view to fit all nodes
-            updateLegend(); // Call updateLegend after graph update
+            updateLegend();
+            stabilizationTimeoutId = setTimeout(() => {
+                // If this timeout fires, it means stabilization didn't complete in time.
+                // We should try to turn off physics.
+                // Check if stabilizationTimeoutId is still the current one (hasn't been cleared by successful stabilization)
+                if (stabilizationTimeoutId) { 
+                    console.warn("Stabilization timeout reached (5s). Forcing physics off.");
+                    if (network) { // Ensure network object exists
+                        network.setOptions({ physics: false });
+                        network.fit(); // Fit the graph after forcing physics off
+                    }
+                    stabilizationTimeoutId = null; // Clear the ID as this timeout has now run
+                }
+            }, 5000); 
         }
 
-        // Function to render the semester view
+        let draggedCourseCode = null;
+        const semesterOrderMap = { 'Fall': 1, 'Winter': 2, 'Summer': 3 };
+        function getSemesterIndex(year, semester) { return parseInt(year) * 10 + semesterOrderMap[semester]; }
+        function arePrerequisitesMet(courseToCheck, targetYear, targetSemester) {
+            const targetSemesterIndex = getSemesterIndex(targetYear, targetSemester);
+            for (const prereqCode of courseToCheck.prereqs) {
+                const prereqCourse = courses.find(c => c.code === prereqCode);
+                if (!prereqCourse) { console.warn(`Prerequisite ${prereqCode} for ${courseToCheck.code} not found.`); continue; }
+                const prereqSemesterIndex = getSemesterIndex(prereqCourse.year, prereqCourse.semester);
+                if (prereqSemesterIndex >= targetSemesterIndex || !prereqCourse.completed) return false;
+            }
+            return true;
+        }
+        function drag(event, courseCode) { draggedCourseCode = courseCode; event.dataTransfer.setData("text/plain", courseCode); event.target.classList.add('opacity-50'); }
+        function allowDrop(event, targetYear, targetSemester) {
+            event.preventDefault(); 
+            const draggedCourse = courses.find(c => c.code === draggedCourseCode);
+            if (!draggedCourse) return;
+            const isValidDrop = arePrerequisitesMet(draggedCourse, targetYear, targetSemester);
+            const semesterDiv = event.currentTarget;
+            if (isValidDrop) { semesterDiv.classList.add('drag-over'); semesterDiv.classList.remove('drag-invalid'); } 
+            else { semesterDiv.classList.add('drag-invalid'); semesterDiv.classList.remove('drag-over'); }
+        }
+        function dragLeave(event) { event.currentTarget.classList.remove('drag-over', 'drag-invalid'); }
+        function drop(event, targetYear, targetSemester) {
+            event.preventDefault();
+            const semesterDiv = event.currentTarget;
+            semesterDiv.classList.remove('drag-over', 'drag-invalid'); 
+            const courseCode = event.dataTransfer.getData("text/plain");
+            const draggedCourse = courses.find(c => c.code === courseCode);
+            if (!draggedCourse) return;
+            if (arePrerequisitesMet(draggedCourse, targetYear, targetSemester)) {
+                draggedCourse.year = targetYear; draggedCourse.semester = targetSemester;
+                updateGraph(); renderSemesterView(); updateCreditSummary(); updateCGPA();
+            } else { console.warn(`Cannot move ${courseCode} to ${targetSemester} ${targetYear}. Prerequisites not met.`); }
+            draggedCourseCode = null;
+            const originalDraggedElement = document.querySelector(`[ondragstart*="${courseCode}"]`);
+            if (originalDraggedElement) originalDraggedElement.classList.remove('opacity-50');
+        }
+
         function renderSemesterView() {
             const semesterViewContainer = document.querySelector('#semesterView .semester-container');
-            semesterViewContainer.innerHTML = ''; // Clear previous content
-
-            // Group courses by year
+            semesterViewContainer.innerHTML = ''; 
             const coursesByYear = courses.reduce((acc, course) => {
-                if (!acc[course.year]) {
-                    acc[course.year] = {};
-                }
-                if (!acc[course.year][course.semester]) {
-                    acc[course.year][course.semester] = [];
-                }
-                acc[course.year][course.semester].push(course);
-                return acc;
+                if (!acc[course.year]) acc[course.year] = {};
+                if (!acc[course.year][course.semester]) acc[course.year][course.semester] = [];
+                acc[course.year][course.semester].push(course); return acc;
             }, {});
-
-            // Sort years numerically
             const sortedYears = Object.keys(coursesByYear).sort((a, b) => parseInt(a) - parseInt(b));
-
             sortedYears.forEach(year => {
-                const yearGroupDiv = document.createElement('div');
-                yearGroupDiv.className = 'year-group';
-
-                const yearTitle = document.createElement('h3');
-                yearTitle.className = 'year-title';
-                yearTitle.textContent = `Year ${year}`;
+                const yearGroupDiv = document.createElement('div'); yearGroupDiv.className = 'year-group';
+                const yearTitle = document.createElement('h3'); yearTitle.className = 'year-title'; yearTitle.textContent = `Year ${year}`;
                 yearGroupDiv.appendChild(yearTitle);
-
-                const semesterRowDiv = document.createElement('div');
-                semesterRowDiv.className = 'semester-row';
-
-                const semestersInOrder = ['Fall', 'Winter', 'Summer']; // Define semester order
+                const semesterRowDiv = document.createElement('div'); semesterRowDiv.className = 'semester-row';
+                const semestersInOrder = ['Fall', 'Winter', 'Summer']; 
                 semestersInOrder.forEach(semesterName => {
-                    const semesterDiv = document.createElement('div');
-                    semesterDiv.className = 'semester';
-
-                    const semesterTitle = document.createElement('h4');
-                    semesterTitle.className = 'semester-title';
-                    semesterTitle.textContent = semesterName;
+                    const semesterDiv = document.createElement('div'); semesterDiv.className = 'semester';
+                    semesterDiv.ondragover = (event) => allowDrop(event, year, semesterName);
+                    semesterDiv.ondrop = (event) => drop(event, year, semesterName);
+                    semesterDiv.ondragleave = (event) => dragLeave(event);
+                    const semesterTitle = document.createElement('h4'); semesterTitle.className = 'semester-title'; semesterTitle.textContent = semesterName;
                     semesterDiv.appendChild(semesterTitle);
-
                     const coursesInSemester = coursesByYear[year][semesterName] || [];
-
-                    // Sort courses within a semester (e.g., by code)
                     coursesInSemester.sort((a, b) => a.code.localeCompare(b.code));
-
                     coursesInSemester.forEach(course => {
-                        const courseCard = document.createElement('div');
-                        courseCard.className = 'course-card';
+                        const courseCard = document.createElement('div'); courseCard.className = 'course-card';
+                        courseCard.setAttribute('draggable', 'true'); 
+                        courseCard.ondragstart = (event) => drag(event, course.code);
+                        courseCard.ondragend = (event) => { event.target.classList.remove('opacity-50'); document.querySelectorAll('.semester').forEach(sem => sem.classList.remove('drag-over', 'drag-invalid')); };
                         courseCard.onclick = () => openCourseModalFromCard(course.code);
-
                         let categoryClass = '';
                         switch (course.category) {
                             case 'program': categoryClass = 'program-bg'; break;
                             case 'breadth': categoryClass = 'breadth-bg'; break;
                             case 'free': categoryClass = 'free-bg'; break;
                         }
-
-                        courseCard.innerHTML = `
-                            <div class="course-details">
-                                <span class="course-code">${course.code}</span>
-                                <span class="course-name">${course.name || 'No Name'}</span>
-                            </div>
-                            <div class="course-meta">
-                                <span class="course-credits">${course.credits} Credits</span>
-                                <span class="course-category ${categoryClass}">${course.category.charAt(0).toUpperCase() + course.category.slice(1)}</span>
-                            </div>
-                        `;
-                        // Add checkmark if course is completed
-                        if (course.completed) {
-                            const checkmarkSpan = document.createElement('span');
-                            checkmarkSpan.classList.add('completed-checkmark');
-                            checkmarkSpan.innerHTML = '&#10004;'; // Unicode checkmark character
-                            courseCard.appendChild(checkmarkSpan);
-                        }
-
+                        courseCard.innerHTML = `<div class="course-details"><span class="course-code">${course.code}</span><span class="course-name">${course.name || 'No Name'}</span></div><div class="course-meta"><span class="course-credits">${course.credits} Credits</span><span class="course-category ${categoryClass}">${course.category.charAt(0).toUpperCase() + course.category.slice(1)}</span></div>`;
+                        if (course.completed) { const checkmarkSpan = document.createElement('span'); checkmarkSpan.classList.add('completed-checkmark'); checkmarkSpan.innerHTML = '&#10004;'; courseCard.appendChild(checkmarkSpan); }
                         semesterDiv.appendChild(courseCard);
                     });
                     semesterRowDiv.appendChild(semesterDiv);
                 });
-
                 yearGroupDiv.appendChild(semesterRowDiv);
                 semesterViewContainer.appendChild(yearGroupDiv);
             });
-            updateLegend(); // Call updateLegend after semester view update
+            updateLegend(); 
         }
 
-        // Helper to open course modal from semester view card
         function openCourseModalFromCard(courseCode) {
             selectedCourseCode = courseCode;
             const course = courses.find(c => c.code === courseCode);
@@ -1120,102 +1131,63 @@
             }
         }
 
-
-        // Function to toggle between flowchart and semester view
         function toggleView() {
             const flowchartDiv = document.getElementById('flowchart');
             const semesterViewDiv = document.getElementById('semesterView');
-            const toggleButton = document.getElementById('toggleViewButton');
-            const toggleButtonSemester = document.getElementById('toggleViewButtonSemester'); // Get the semester view button
-
+            const toggleButtonFlowchart = document.getElementById('toggleViewButton'); 
+            const toggleButtonSemester = document.getElementById('toggleViewButtonSemester');
             if (currentView === 'prerequisite') {
                 flowchartDiv.style.opacity = '0';
-                flowchartDiv.style.height = '0';
                 setTimeout(() => {
-                    flowchartDiv.style.display = 'none';
-                    semesterViewDiv.style.display = 'block';
-                    // Trigger reflow to ensure animation plays
-                    semesterViewDiv.offsetHeight;
-                    semesterViewDiv.style.opacity = '1';
-                    semesterViewDiv.style.height = 'auto'; // Let content define height
-                    renderSemesterView(); // Render semester view when switching
-                    currentView = 'semester';
-                    // Update main toggle button icon to flowchart
-                    toggleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-git-branch"><line x1="6" x2="6" y1="3" y2="15"/><path d="M18 6a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M6 18a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M6 15v3c0 1.1.9 2 2 2h4"/><path d="M18 15v3c0 1.1.9 2 2 2h-4"/></svg>`;
-                    // Hide the semester view button (it's inside the semester view div)
-                    toggleButtonSemester.style.display = 'block'; // Ensure it's visible when semester view is active
-                }, 300); // Match CSS transition duration
-            } else {
+                    flowchartDiv.style.display = 'none'; semesterViewDiv.style.display = 'block';
+                    semesterViewDiv.offsetHeight; semesterViewDiv.style.opacity = '1';
+                    renderSemesterView(); currentView = 'semester';
+                    toggleButtonSemester.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-git-branch"><line x1="6" x2="6" y1="3" y2="15"/><path d="M18 6a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M6 18a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M6 15v3c0 1.1.9 2 2 2h4"/><path d="M18 15v3c0 1.1.9 2 2 2h-4"/></svg>`;
+                }, 300); 
+            } else { 
                 semesterViewDiv.style.opacity = '0';
-                semesterViewDiv.style.height = '0';
                 setTimeout(() => {
-                    semesterViewDiv.style.display = 'none';
-                    flowchartDiv.style.display = 'block';
-                    // Trigger reflow
-                    flowchartDiv.offsetHeight;
-                    flowchartDiv.style.opacity = '1';
-                    flowchartDiv.style.height = '600px'; // Restore fixed height
-                    network.fit(); // Recenter flowchart after display change
+                    semesterViewDiv.style.display = 'none'; flowchartDiv.style.display = 'block';
+                    flowchartDiv.offsetHeight; flowchartDiv.style.opacity = '1';
+                    if (network) network.fit({animation: {duration: 500, easingFunction: 'easeOutQuad'}}); 
                     currentView = 'prerequisite';
-                    // Update main toggle button icon to calendar
-                    toggleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar-check"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/></svg>`;
-                    // Hide the semester view button (it's inside the semester view div, so it will be hidden with the div)
-                    toggleButtonSemester.style.display = 'none';
-                }, 300); // Match CSS transition duration
+                    toggleButtonFlowchart.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar-check"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/></svg>`;
+                }, 300); 
             }
-            // Move the toggle button to the correct parent
-            if (currentView === 'prerequisite') {
-                document.getElementById('flowchart').appendChild(toggleButton);
-            } else {
-                document.getElementById('semesterView').appendChild(toggleButtonSemester); // Use the semester-specific button
-            }
-            updateLegend(); // Call updateLegend after view toggle
+            updateLegend(); 
         }
 
-        // Function to update the legend text based on the current view
         function updateLegend() {
             const incompleteLegend = document.getElementById('incompleteLegend');
             if (currentView === 'prerequisite') {
-                incompleteLegend.innerHTML = 'Dashed = Incomplete';
-            } else {
-                incompleteLegend.innerHTML = '<span style="color: #48bb78;">&#10004;</span> = Completed';
+                incompleteLegend.innerHTML = '<span style="border:2px dashed #a0aec0; background:transparent; display:inline-block; vertical-align:middle; width:12px; height:12px; margin-right:8px;"></span> = Incomplete';
+            } else { 
+                incompleteLegend.innerHTML = '<span style="color: #48bb78; font-weight:bold; vertical-align:middle;">&#10004;</span> = Completed';
             }
         }
 
-
-        // Function to animate recenter button click
         function animateRecenter() {
-            network.fit({ animation: { duration: 1000, easingFunction: 'easeInOutQuad' } });
+            if (network && currentView === 'prerequisite') {
+                 network.fit({ animation: { duration: 1000, easingFunction: 'easeInOutQuad' } });
+            }
         }
 
-        // Function to update credit summary
         function updateCreditSummary() {
-            currentCredits = 0.0;
-            programCredits = 0.0;
-            breadthCredits = 0.0;
-            freeCredits = 0.0;
-
+            currentCredits = 0.0; programCredits = 0.0; breadthCredits = 0.0; freeCredits = 0.0;
             courses.forEach(course => {
                 if (course.completed) {
                     currentCredits += course.credits;
-                    if (course.category === 'program') {
-                        programCredits += course.credits;
-                    } else if (course.category === 'breadth') {
-                        breadthCredits += course.credits;
-                    } else if (course.category === 'free') {
-                        freeCredits += course.credits;
-                    }
+                    if (course.category === 'program') programCredits += course.credits;
+                    else if (course.category === 'breadth') breadthCredits += course.credits;
+                    else if (course.category === 'free') freeCredits += course.credits;
                 }
             });
-
             document.getElementById('currentCredits').textContent = currentCredits.toFixed(1);
             document.getElementById('programCredits').textContent = programCredits.toFixed(1);
             document.getElementById('breadthCredits').textContent = breadthCredits.toFixed(1);
             document.getElementById('freeCredits').textContent = freeCredits.toFixed(1);
-
-            const progress = (currentCredits / totalCreditsRequired) * 100;
+            const progress = (totalCreditsRequired > 0 ? (currentCredits / totalCreditsRequired) * 100 : 0); // Avoid division by zero
             document.getElementById('creditsBar').style.width = `${Math.min(progress, 100)}%`;
-
             const creditsWarning = document.getElementById('creditsWarning');
             if (currentCredits < totalCreditsRequired) {
                 creditsWarning.textContent = `You still need ${ (totalCreditsRequired - currentCredits).toFixed(1)} credits to graduate.`;
@@ -1225,20 +1197,14 @@
             }
         }
 
-        // Function to update CGPA
         function updateCGPA() {
-            let totalGradePoints = 0;
-            let totalCreditsForCGPA = 0;
-            let majorGradePoints = 0;
-            let majorCreditsForCGPA = 0;
-
+            let totalGradePoints = 0, totalCreditsForCGPA = 0, majorGradePoints = 0, majorCreditsForCGPA = 0;
             courses.forEach(course => {
                 if (course.grade !== 'N/A' && course.completed) {
                     const gradePoint = gpaScale[course.grade];
                     if (gradePoint !== undefined) {
                         totalGradePoints += gradePoint * course.credits;
                         totalCreditsForCGPA += course.credits;
-
                         if (course.majorCGPA) {
                             majorGradePoints += gradePoint * course.credits;
                             majorCreditsForCGPA += course.credits;
@@ -1246,49 +1212,27 @@
                     }
                 }
             });
-
-            const cgpa = totalCreditsForCGPA > 0 ? (totalGradePoints / totalCreditsForCGPA).toFixed(2) : '0.00';
-            const majorCgpa = majorCreditsForCGPA > 0 ? (majorGradePoints / majorCreditsForCGPA).toFixed(2) : '0.00';
-
-            document.getElementById('cgpa').textContent = cgpa;
-            document.getElementById('majorCgpa').textContent = majorCgpa;
+            document.getElementById('cgpa').textContent = totalCreditsForCGPA > 0 ? (totalGradePoints / totalCreditsForCGPA).toFixed(2) : '0.00';
+            document.getElementById('majorCgpa').textContent = majorCreditsForCGPA > 0 ? (majorGradePoints / majorCreditsForCGPA).toFixed(2) : '0.00';
         }
 
-        // Function to toggle credits table visibility
         function toggleCreditsTable() {
             const creditsTable = document.getElementById('creditsTable');
             creditsTable.classList.toggle('hidden');
             const chevron = document.querySelector('#totalCreditsWrapper svg');
-            if (creditsTable.classList.contains('hidden')) {
-                chevron.style.transform = 'rotate(0deg)';
-            } else {
-                chevron.style.transform = 'rotate(180deg)';
-            }
+            chevron.style.transform = creditsTable.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
         }
 
-        // Function to save courses to a JSON file
         function saveCourses() {
-            const dataStr = JSON.stringify({
-                courses: courses,
-                requirements: {
-                    totalCreditsRequired,
-                    programCreditsRequired,
-                    breadthCreditsRequired,
-                    freeCreditsRequired
-                }
-            }, null, 2);
+            const dataStr = JSON.stringify({ courses: courses, requirements: { totalCreditsRequired, programCreditsRequired, breadthCreditsRequired, freeCreditsRequired }}, null, 2);
             const blob = new Blob([dataStr], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url;
-            a.download = 'courses.json';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            a.href = url; a.download = 'courses.json';
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a); URL.revokeObjectURL(url);
         }
 
-        // Event listener for loading courses from a JSON file
         document.getElementById('loadCourses').addEventListener('change', function(event) {
             const file = event.target.files[0];
             if (file) {
@@ -1307,10 +1251,7 @@
                             document.getElementById('breadthCreditsRequired').textContent = breadthCreditsRequired.toFixed(1);
                             document.getElementById('freeCreditsRequired').textContent = freeCreditsRequired.toFixed(1);
                         }
-                        updateGraph();
-                        renderSemesterView(); // Render semester view after loading
-                        updateCreditSummary();
-                        updateCGPA();
+                        updateGraph(); renderSemesterView(); updateCreditSummary(); updateCGPA(); updateAutocomplete();
                     } catch (error) {
                         console.error('Error parsing JSON:', error);
                         document.getElementById('error').textContent = 'Error loading file. Please ensure it is a valid JSON.';
@@ -1321,7 +1262,6 @@
             }
         });
 
-        // Function to open requirements modal
         function openRequirementsModal() {
             document.getElementById('reqTotalCredits').value = totalCreditsRequired;
             document.getElementById('reqProgramCredits').value = programCreditsRequired;
@@ -1330,44 +1270,29 @@
             showModal('requirementsModal');
         }
 
-        // Function to update degree requirements
         function updateRequirements() {
             const reqTotal = parseFloat(document.getElementById('reqTotalCredits').value);
             const reqProgram = parseFloat(document.getElementById('reqProgramCredits').value);
             const reqBreadth = parseFloat(document.getElementById('reqBreadthCredits').value);
             const reqFree = parseFloat(document.getElementById('reqFreeCredits').value);
             const reqErrorElement = document.getElementById('reqError');
-
             reqErrorElement.classList.add('hidden');
-
-            if (isNaN(reqTotal) || isNaN(reqProgram) || isNaN(reqBreadth) || isNaN(reqFree) ||
-                reqTotal < 0 || reqProgram < 0 || reqBreadth < 0 || reqFree < 0) {
+            if (isNaN(reqTotal) || isNaN(reqProgram) || isNaN(reqBreadth) || isNaN(reqFree) || reqTotal < 0 || reqProgram < 0 || reqBreadth < 0 || reqFree < 0) {
                 reqErrorElement.textContent = 'Please enter valid positive numbers for all requirements.';
-                reqErrorElement.classList.remove('hidden');
-                return;
+                reqErrorElement.classList.remove('hidden'); return;
             }
-
-            totalCreditsRequired = reqTotal;
-            programCreditsRequired = reqProgram;
-            breadthCreditsRequired = reqBreadth;
-            freeCreditsRequired = reqFree;
-
+            totalCreditsRequired = reqTotal; programCreditsRequired = reqProgram; breadthCreditsRequired = reqBreadth; freeCreditsRequired = reqFree;
             document.getElementById('totalCreditsDisplay').textContent = totalCreditsRequired.toFixed(1);
             document.getElementById('programCreditsRequired').textContent = programCreditsRequired.toFixed(1);
             document.getElementById('breadthCreditsRequired').textContent = breadthCreditsRequired.toFixed(1);
             document.getElementById('freeCreditsRequired').textContent = freeCreditsRequired.toFixed(1);
-
-            updateCreditSummary();
-            closeModal('requirementsModal');
+            updateCreditSummary(); closeModal('requirementsModal');
         }
 
-        // Initial render on page load
         document.addEventListener('DOMContentLoaded', () => {
-            updateGraph(); // Render initial flowchart
-            renderSemesterView(); // Render initial semester view
-            updateCreditSummary();
-            updateCGPA();
-            updateLegend(); // Ensure legend is correctly initialized
+            document.getElementById('toggleViewButton').innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar-check"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/></svg>`;
+            updateGraph(); 
+            updateCreditSummary(); updateCGPA(); updateLegend(); updateAutocomplete(); 
         });
     </script>
 </body>
