@@ -22,10 +22,29 @@
             border-radius: 0.5rem;
             padding: 1.5rem;
         }
-        /* Custom select arrow */
+        /* Custom select arrow and styling */
         .select-wrapper {
             position: relative;
             display: inline-block;
+            width: 100%; /* Make it fill its container */
+        }
+        .select-wrapper select {
+            appearance: none; /* Reset default appearance */
+            -webkit-appearance: none; /* For Safari */
+            -moz-appearance: none; /* For Firefox */
+            width: 100%;
+            background-color: #2d3748; /* Consistent dark background */
+            color: #e2e8f0;
+            border: 1px solid #4a5568;
+            border-radius: 0.5rem;
+            padding: 0.625rem 2.5rem 0.625rem 1rem; /* Adjust padding for arrow space */
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .select-wrapper select:focus {
+            border-color: #63b3ed;
+            box-shadow: 0 0 0 2px rgba(99, 179, 237, 0.2); /* Optional: subtle focus highlight */
         }
         .select-wrapper::after {
             content: '';
@@ -489,7 +508,7 @@
                 <p><span style="background-color: #3b82f6;"></span>Program</p>
                 <p><span style="background-color: #10b981;"></span>Breadth</p>
                 <p><span style="background-color: #8b5cf6;"></span>Free</p>
-                <p>Dashed = Incomplete</p>
+                <p id="incompleteLegend"><span style="color: #48bb78;">&#10004;</span> = Completed</p>
             </div>
         </div>
 
@@ -928,9 +947,14 @@
                         courseLevel = parseInt(course.year) * 3; // Fallback
                 }
 
+                let nodeLabel = `${course.code}\n${course.name}\n${course.credits} Credits`;
+                if (course.completed) {
+                    nodeLabel += ' ✅'; // Add checkmark to label for completed courses
+                }
+
                 nodes.add({
                     id: course.code,
-                    label: `${course.code}\n${course.name}\n${course.credits} Credits`,
+                    label: nodeLabel,
                     color: {
                         background: nodeColor,
                         border: borderColor,
@@ -986,6 +1010,7 @@
             }
 
             network.fit(); // Adjust view to fit all nodes
+            updateLegend(); // Call updateLegend after graph update
         }
 
         // Function to render the semester view
@@ -1056,8 +1081,15 @@
                                 <span class="course-credits">${course.credits} Credits</span>
                                 <span class="course-category ${categoryClass}">${course.category.charAt(0).toUpperCase() + course.category.slice(1)}</span>
                             </div>
-                            ${course.completed ? '<span class="completed-checkmark">✔</span>' : ''}
                         `;
+                        // Add checkmark if course is completed
+                        if (course.completed) {
+                            const checkmarkSpan = document.createElement('span');
+                            checkmarkSpan.classList.add('completed-checkmark');
+                            checkmarkSpan.innerHTML = '&#10004;'; // Unicode checkmark character
+                            courseCard.appendChild(checkmarkSpan);
+                        }
+
                         semesterDiv.appendChild(courseCard);
                     });
                     semesterRowDiv.appendChild(semesterDiv);
@@ -1066,6 +1098,7 @@
                 yearGroupDiv.appendChild(semesterRowDiv);
                 semesterViewContainer.appendChild(yearGroupDiv);
             });
+            updateLegend(); // Call updateLegend after semester view update
         }
 
         // Helper to open course modal from semester view card
@@ -1135,6 +1168,17 @@
                 document.getElementById('flowchart').appendChild(toggleButton);
             } else {
                 document.getElementById('semesterView').appendChild(toggleButtonSemester); // Use the semester-specific button
+            }
+            updateLegend(); // Call updateLegend after view toggle
+        }
+
+        // Function to update the legend text based on the current view
+        function updateLegend() {
+            const incompleteLegend = document.getElementById('incompleteLegend');
+            if (currentView === 'prerequisite') {
+                incompleteLegend.innerHTML = 'Dashed = Incomplete';
+            } else {
+                incompleteLegend.innerHTML = '<span style="color: #48bb78;">&#10004;</span> = Completed';
             }
         }
 
@@ -1323,6 +1367,7 @@
             renderSemesterView(); // Render initial semester view
             updateCreditSummary();
             updateCGPA();
+            updateLegend(); // Ensure legend is correctly initialized
         });
     </script>
 </body>
