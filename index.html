@@ -754,13 +754,12 @@
         let selectedCourseCode = null;
         let newlyAddedCourse = null;
         let currentView = 'prerequisite'; // 'prerequisite' or 'semester'
-        let stabilizationTimeoutId = null; 
+        let physicsEnabledAfterInitialLayout = false; // Track if physics should be on after initial load
 
         // SVG Icons for buttons
         const calendarIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar-check"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/></svg>`;
         const branchIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-git-branch"><line x1="6" x2="6" y1="3" y2="15"/><path d="M18 6a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M6 18a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M6 15v3c0 1.1.9 2 2 2h4"/><path d="M18 15v3c0 1.1.9 2 2 2h-4"/></svg>`;
-        // Fullscreen icons are already in the HTML for the button
-
+        
         // Prohibited courses
         const prohibitedCourses = [
             'BUSI1401', 'BUSI2401', 'BUSI2402', 'BUSI3400', 'COMP1001', 'MATH1009', 'MATH1119',
@@ -779,49 +778,53 @@
         // Initialize vis.js network
         const visContainer = document.getElementById('flowchart-canvas');
         const data = { nodes: nodes, edges: edges };
-        const options = {
+        const initialOptions = { // Options used for the very first load
             layout: {
                 hierarchical: {
                     enabled: true, direction: 'UD', sortMethod: 'directed', 
-                    levelSeparation: 150, nodeSpacing: 250, treeSpacing: 200,
+                    levelSeparation: 170, nodeSpacing: 280, treeSpacing: 220, // Slightly increased spacing
                     blockShifting: true, edgeMinimization: true, parentCentralization: true
                 }
             },
             nodes: {
-                shape: 'box', font: { size: 14, color: '#e2e8f0' },
+                shape: 'box', font: { size: 14, color: '#e2e8f0', multi: 'md', face: 'Inter' },
                 color: {
                     border: '#4a5568', background: '#2d3748',
                     highlight: { border: '#63b3ed', background: '#4c5d73' },
                     hover: { border: '#63b3ed', background: '#4c5d73' }
                 },
-                margin: 12, widthConstraint: { minimum: 150, maximum: 250 }, 
-                heightConstraint: { minimum: 60 }, shapeProperties: { borderRadius: 6 }
+                margin: 15, widthConstraint: { minimum: 160, maximum: 260 }, 
+                heightConstraint: { minimum: 65 }, shapeProperties: { borderRadius: 8 }
             },
             edges: {
                 arrows: 'to', color: { color: '#a0aec0', highlight: '#63b3ed', hover: '#63b3ed' },
-                width: 1.5, smooth: { enabled: true, type: 'cubicBezier', forceDirection: 'vertical', roundness: 0.1 }
+                width: 1.5, 
+                smooth: { enabled: true, type: 'cubicBezier', forceDirection: 'vertical', roundness: 0.05 } // Straighter lines
             },
-            physics: {
-                enabled: true, hierarchicalRepulsion: { 
-                    centralGravity: 0.0, springLength: 120, springConstant: 0.02, 
-                    nodeDistance: 200, damping: 0.15 
+            physics: { // Physics enabled for initial layout
+                enabled: true, 
+                hierarchicalRepulsion: { 
+                    centralGravity: 0.0, springLength: 150, springConstant: 0.015, 
+                    nodeDistance: 250, damping: 0.1
                 },
-                barnesHut: { 
-                    gravitationalConstant: -2000, centralGravity: 0.1, springLength: 95,
-                    springConstant: 0.04, damping: 0.09, avoidOverlap: 0.5 
-                },
-                solver: 'hierarchicalRepulsion', stabilization: {
-                    enabled: true, iterations: 1000, updateInterval: 50,
-                    onlyDynamicEdges: false, fit: true 
+                solver: 'hierarchicalRepulsion', 
+                stabilization: {
+                    enabled: true, iterations: 1500, updateInterval: 25,
+                    fit: true 
                 }
             },
             interaction: { hover: true, tooltipDelay: 200 }
         };
-        const network = new vis.Network(visContainer, data, options);
+        const network = new vis.Network(visContainer, data, initialOptions);
 
         network.on("stabilizationIterationsDone", () => {
-            if (stabilizationTimeoutId) { clearTimeout(stabilizationTimeoutId); stabilizationTimeoutId = null; }
-            network.fit(); 
+            // This event fires after the initial layout (and any subsequent physics-enabled operations)
+            if (!physicsEnabledAfterInitialLayout) {
+                network.setOptions({ physics: false }); // Turn off physics
+                // console.log("Physics disabled after initial stabilization.");
+                physicsEnabledAfterInitialLayout = true; // Ensure this only happens once after the very first load/stabilization
+            }
+             network.fit(); 
         });
         
         network.on('click', (params) => {
@@ -962,6 +965,9 @@
             document.getElementById('majorCGPA').checked = true; 
             document.getElementById('completed').checked = false;
             
+            // When adding a new course, briefly re-enable physics for layout adjustment
+            network.setOptions({ physics: true }); 
+            physicsEnabledAfterInitialLayout = false; // Allow stabilization to turn it off again
             updateAllViewsAndSummaries();
         }
 
@@ -987,6 +993,9 @@
             const courseIndex = courses.findIndex(c => c.code === courseCode);
             if (courseIndex !== -1) {
                 courses[courseIndex] = { ...courses[courseIndex], name: courseName, prereqs: prerequisites, credits: credits, category: category, grade: grade, year: year, semester: semester, majorCGPA: majorCGPA, completed: completed };
+                // Briefly re-enable physics for layout adjustment
+                network.setOptions({ physics: true });
+                physicsEnabledAfterInitialLayout = false; // Allow stabilization to turn it off again
                 updateAllViewsAndSummaries();
                 closeModal('courseModal');
             }
@@ -996,14 +1005,17 @@
             const courseCode = document.getElementById('modalCourseCode').value;
             courses = courses.filter(c => c.code !== courseCode);
             courses.forEach(course => { course.prereqs = course.prereqs.filter(prereq => prereq !== courseCode); });
+            // Briefly re-enable physics for layout adjustment
+            network.setOptions({ physics: true });
+            physicsEnabledAfterInitialLayout = false; // Allow stabilization to turn it off again
             updateAllViewsAndSummaries();
             closeModal('courseModal');
         }
         
         function updateGraph() {
             nodes.clear(); edges.clear();
-            if (stabilizationTimeoutId) { clearTimeout(stabilizationTimeoutId); stabilizationTimeoutId = null; }
-            if (network) network.setOptions( { physics: true } ); 
+            // Physics are typically re-enabled by addCourse/updateCourse/deleteCourse before calling this.
+            // The stabilizationIterationsDone event will handle disabling it.
 
             const sortedCourses = [...courses].sort((a, b) => {
                 if (a.year !== b.year) return parseInt(a.year) - parseInt(b.year);
@@ -1016,9 +1028,10 @@
                 nodes.add({ 
                     id: `year-${year}`, label: `Year ${year}`, shape: 'box', 
                     color: { background: '#374151', border: '#4a5568' }, 
-                    font: { color: '#e2e8f0', size: 16, bold: true }, 
+                    font: { color: '#e2e8f0', size: 18, bold: true, face: 'Inter' }, // Slightly larger year font
                     group: 'years', level: (parseInt(year) * 4) - 4, 
-                    physics: false, margin: { top: 20, bottom: 20 }
+                    physics: false, // Year nodes themselves don't need physics
+                    margin: { top: 25, bottom: 25, left: 50, right: 50 } // More margin for year nodes
                 });
             });
 
@@ -1047,7 +1060,7 @@
 
                 nodes.add({ 
                     id: course.code, label: nodeLabel, 
-                    title: `Credits: ${course.credits}<br>Category: ${course.category}<br>Status: ${course.completed ? 'Completed' : 'Planned'}`, 
+                    title: `${course.credits}, ${course.category}, ${course.completed ? 'Completed' : 'Planned'}`, 
                     color: { 
                         background: nodeColor, border: borderColor,
                         highlight: { border: '#63b3ed', background: nodeColor }, 
@@ -1060,11 +1073,26 @@
                     level: courseLevel
                 });
 
+                // Edges for prerequisites
                 course.prereqs.forEach(prereqCode => {
                     if (nodes.get(prereqCode)) { 
                         edges.add({ from: prereqCode, to: course.code, arrows: 'to' });
                     }
                 });
+
+                // Edges from Year node to its courses
+                if (nodes.get(`year-${course.year}`)) {
+                     edges.add({ 
+                         from: `year-${course.year}`, 
+                         to: course.code, 
+                         arrows: {to: {enabled: false}}, // No arrow
+                         color: { color: '#4a5568', opacity: 0.4 }, // Lighter, more transparent
+                         dashes: [3,3], // Dashed line
+                         smooth: { type: 'cubicBezier', forceDirection: 'vertical', roundness: 0.2 }, // Smooth, slightly curved
+                         chosen: false, // Not interactive for selection
+                         physics: false // These edges don't participate in physics
+                    });
+                }
             });
 
             if (newlyAddedCourse && nodes.get(newlyAddedCourse)) {
@@ -1077,16 +1105,13 @@
                     nodeElement.addEventListener('animationend', () => nodeElement.classList.remove('node-pop'), { once: true }); 
                 }
                 newlyAddedCourse = null;
-            } else if (network) {
-                 network.fit(); 
+            } else if (network && !physicsEnabledAfterInitialLayout) { // Only fit if physics are about to be disabled
+                 // The fit will happen in stabilizationIterationsDone if physics are on
+            } else if (network && physicsEnabledAfterInitialLayout) { // If physics are already off, fit now
+                network.fit();
             }
             
             updateLegend(); 
-
-            stabilizationTimeoutId = setTimeout(() => {
-                if (stabilizationTimeoutId && network) {  }
-                stabilizationTimeoutId = null; 
-            }, 7000); 
         }
         
         let draggedCourseCode = null;
@@ -1156,6 +1181,9 @@
             if (meetsPrerequisites && wontBreakDownstream) {
                 draggedCourse.year = targetYear; 
                 draggedCourse.semester = targetSemester;
+                // When moving a course in semester view, also re-trigger flowchart physics briefly
+                network.setOptions({ physics: true });
+                physicsEnabledAfterInitialLayout = false; // Allow stabilization to turn it off again
                 updateAllViewsAndSummaries();
             } else { 
                 let errorMessages = [];
@@ -1288,7 +1316,12 @@
                     flowchartDiv.style.display = 'block';
                     flowchartDiv.offsetHeight; 
                     flowchartDiv.style.opacity = '1';
-                    if (network) network.fit({animation: {duration: 500, easingFunction: 'easeOutQuad'}}); 
+                    if (network) {
+                         // If physics are off, fit now. Otherwise, stabilization will handle it.
+                        if (!network.physics.options.enabled) {
+                            network.fit({animation: {duration: 500, easingFunction: 'easeOutQuad'}}); 
+                        }
+                    }
                     currentView = 'prerequisite';
                     flowchartToggleBtn.innerHTML = calendarIconSVG;
                     semesterToggleBtn.innerHTML = calendarIconSVG;
@@ -1482,6 +1515,9 @@
                             document.getElementById('breadthCreditsRequired').textContent = breadthCreditsRequired.toFixed(1);
                             document.getElementById('freeCreditsRequired').textContent = freeCreditsRequired.toFixed(1);
                         }
+                        // When loading, ensure physics are enabled for the initial layout of loaded data
+                        network.setOptions({ physics: true });
+                        physicsEnabledAfterInitialLayout = false; // Allow stabilization to turn it off again
                         updateAllViewsAndSummaries();
                         showMessageBox("Courses and requirements loaded successfully!");
                     } catch (error) {
@@ -1537,7 +1573,6 @@
         function toggleFullScreenFlowchart() {
             const flowchartElement = document.getElementById('flowchart');
             
-            // Check if fullscreen is enabled/allowed by the browser and current context
             const isFullscreenEnabled = document.fullscreenEnabled || 
                                       document.webkitFullscreenEnabled || 
                                       document.mozFullScreenEnabled || 
@@ -1553,27 +1588,15 @@
                     !document.mozFullScreenElement && 
                     !document.webkitFullscreenElement && 
                     !document.msFullscreenElement) {
-                    // Request fullscreen
-                    if (flowchartElement.requestFullscreen) {
-                        flowchartElement.requestFullscreen();
-                    } else if (flowchartElement.mozRequestFullScreen) { /* Firefox */
-                        flowchartElement.mozRequestFullScreen();
-                    } else if (flowchartElement.webkitRequestFullscreen) { /* Chrome, Safari & Opera */
-                        flowchartElement.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT); // ALLOW_KEYBOARD_INPUT is deprecated but some older versions might need it.
-                    } else if (flowchartElement.msRequestFullscreen) { /* IE/Edge */
-                        flowchartElement.msRequestFullscreen();
-                    }
+                    if (flowchartElement.requestFullscreen) flowchartElement.requestFullscreen();
+                    else if (flowchartElement.mozRequestFullScreen) flowchartElement.mozRequestFullScreen();
+                    else if (flowchartElement.webkitRequestFullscreen) flowchartElement.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
+                    else if (flowchartElement.msRequestFullscreen) flowchartElement.msRequestFullscreen();
                 } else {
-                    // Exit fullscreen
-                    if (document.exitFullscreen) {
-                        document.exitFullscreen();
-                    } else if (document.mozCancelFullScreen) { /* Firefox */
-                        document.mozCancelFullScreen();
-                    } else if (document.webkitExitFullscreen) { /* Chrome, Safari & Opera */
-                        document.webkitExitFullscreen();
-                    } else if (document.msExitFullscreen) { /* IE/Edge */
-                        document.msExitFullscreen();
-                    }
+                    if (document.exitFullscreen) document.exitFullscreen();
+                    else if (document.mozCancelFullScreen) document.mozCancelFullScreen();
+                    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+                    else if (document.msExitFullscreen) document.msExitFullscreen();
                 }
             } catch (e) {
                 console.error("Fullscreen API error:", e);
@@ -1594,7 +1617,6 @@
                 exitIcon.classList.add('hidden');
             }
             if(network) {
-                // Delay slightly to allow browser to resize, then fit network
                 setTimeout(() => network.fit(), 100); 
             }
         }
@@ -1619,11 +1641,14 @@
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('toggleViewButton').innerHTML = calendarIconSVG;
             document.getElementById('toggleViewButtonSemester').innerHTML = calendarIconSVG;
-            // Ensure initial state of fullscreen button icons is correct
-            handleFullscreenChange(); // Call this to set initial icon state based on current fullscreen status (likely not fullscreen)
+            handleFullscreenChange(); 
 
 
-            updateAllViewsAndSummaries();
+            // Set initial physics state for the very first load
+            physicsEnabledAfterInitialLayout = false; // It will be turned off after first stabilization
+            network.setOptions({ physics: true }); // Ensure physics are on for the initial draw
+
+            updateAllViewsAndSummaries(); // This will call updateGraph
             
             document.getElementById('totalCreditsDisplay').textContent = totalCreditsRequired.toFixed(1);
             document.getElementById('programCreditsRequired').textContent = programCreditsRequired.toFixed(1);
