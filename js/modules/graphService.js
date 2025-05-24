@@ -438,6 +438,12 @@ export function handleFullscreenChangeHandler() {
     if (enterIcon) DOMUtils.toggleElementClass(enterIcon.id, 'hidden', isFullScreen);
     if (exitIcon) DOMUtils.toggleElementClass(exitIcon.id, 'hidden', !isFullScreen);
     
+    // Hide calendar view toggle button in fullscreen
+    const calendarToggle = DOMUtils.getElementById('toggleViewButton');
+    if (calendarToggle) {
+        calendarToggle.style.display = isFullScreen ? 'none' : '';
+    }
+    
     if(network) {
         setTimeout(() => {
             // Re-apply custom layout on fullscreen change to adjust to new width
