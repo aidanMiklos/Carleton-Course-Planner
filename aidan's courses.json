@@ -1,0 +1,455 @@
+{
+  "courses": [
+    {
+      "code": "COMP1405",
+      "name": "Computer Science 1",
+      "prereqs": [],
+      "credits": 0.5,
+      "category": "program",
+      "grade": "A+",
+      "year": "1",
+      "semester": "Fall",
+      "majorCGPA": true,
+      "completed": true
+    },
+    {
+      "code": "COMP1406",
+      "name": "Computer Science 2",
+      "prereqs": [
+        "COMP1405"
+      ],
+      "credits": 0.5,
+      "category": "program",
+      "grade": "A+",
+      "year": "1",
+      "semester": "Winter",
+      "majorCGPA": true,
+      "completed": true
+    },
+    {
+      "code": "LING1100",
+      "name": "Mysteries of Language",
+      "prereqs": [],
+      "credits": 0.5,
+      "category": "breadth",
+      "grade": "A-",
+      "year": "1",
+      "semester": "Winter",
+      "majorCGPA": false,
+      "completed": true
+    },
+    {
+      "code": "COMP1805",
+      "name": "Discrete Structures",
+      "prereqs": [],
+      "credits": 0.5,
+      "category": "program",
+      "grade": "A",
+      "year": "1",
+      "semester": "Fall",
+      "majorCGPA": true,
+      "completed": true
+    },
+    {
+      "code": "MATH1007",
+      "name": "Calculus",
+      "prereqs": [],
+      "credits": 0.5,
+      "category": "program",
+      "grade": "A",
+      "year": "1",
+      "semester": "Fall",
+      "majorCGPA": false,
+      "completed": true
+    },
+    {
+      "code": "MATH1104",
+      "name": "Linear Algebra",
+      "prereqs": [],
+      "credits": 0.5,
+      "category": "program",
+      "grade": "A",
+      "year": "1",
+      "semester": "Fall",
+      "majorCGPA": false,
+      "completed": true
+    },
+    {
+      "code": "STAT2507",
+      "name": "Intro to Statistical Modeling I",
+      "prereqs": [],
+      "credits": 0.5,
+      "category": "program",
+      "grade": "B",
+      "year": "1",
+      "semester": "Fall",
+      "majorCGPA": false,
+      "completed": true
+    },
+    {
+      "code": "MATH2007",
+      "name": "Calculus 2",
+      "prereqs": [
+        "MATH1007"
+      ],
+      "credits": 0.5,
+      "category": "free",
+      "grade": "A",
+      "year": "1",
+      "semester": "Winter",
+      "majorCGPA": false,
+      "completed": true
+    },
+    {
+      "code": "MATH2107",
+      "name": "Linear Algebra 2",
+      "prereqs": [
+        "MATH1104"
+      ],
+      "credits": 0.5,
+      "category": "program",
+      "grade": "A+",
+      "year": "1",
+      "semester": "Winter",
+      "majorCGPA": false,
+      "completed": true
+    },
+    {
+      "code": "COMP2804",
+      "name": "Discrete Structures 2",
+      "prereqs": [
+        "COMP1805"
+      ],
+      "credits": 0.5,
+      "category": "program",
+      "grade": "A-",
+      "year": "1",
+      "semester": "Winter",
+      "majorCGPA": true,
+      "completed": true
+    },
+    {
+      "code": "COMP2401",
+      "name": "Intro to Systems Programming",
+      "prereqs": [
+        "COMP1406"
+      ],
+      "credits": 0.5,
+      "category": "program",
+      "grade": "N/A",
+      "year": "2",
+      "semester": "Fall",
+      "majorCGPA": true,
+      "completed": false
+    },
+    {
+      "code": "STAT2605",
+      "name": "Probability Models",
+      "prereqs": [
+        "MATH1104",
+        "MATH1007"
+      ],
+      "credits": 0.5,
+      "category": "free",
+      "grade": "N/A",
+      "year": "3",
+      "semester": "Winter",
+      "majorCGPA": false,
+      "completed": false
+    },
+    {
+      "code": "COMP2402",
+      "name": "Abstract Data Types and Algorithms",
+      "prereqs": [
+        "COMP1406"
+      ],
+      "credits": 0.5,
+      "category": "program",
+      "grade": "N/A",
+      "year": "2",
+      "semester": "Fall",
+      "majorCGPA": true,
+      "completed": false
+    },
+    {
+      "code": "COMP2404",
+      "name": "Introduction to Software Engineering",
+      "prereqs": [
+        "COMP2401"
+      ],
+      "credits": 0.5,
+      "category": "program",
+      "grade": "N/A",
+      "year": "2",
+      "semester": "Winter",
+      "majorCGPA": true,
+      "completed": false
+    },
+    {
+      "code": "COMP2406",
+      "name": "Fundamentals of Web Applications",
+      "prereqs": [
+        "COMP1406"
+      ],
+      "credits": 0.5,
+      "category": "program",
+      "grade": "N/A",
+      "year": "2",
+      "semester": "Fall",
+      "majorCGPA": true,
+      "completed": false
+    },
+    {
+      "code": "COMP3004",
+      "name": "Object-Oriented Software Engineering",
+      "prereqs": [
+        "COMP2401",
+        "COMP2406"
+      ],
+      "credits": 0.5,
+      "category": "program",
+      "grade": "N/A",
+      "year": "2",
+      "semester": "Winter",
+      "majorCGPA": true,
+      "completed": false
+    },
+    {
+      "code": "COMP3000",
+      "name": "Operating Systems",
+      "prereqs": [
+        "COMP2401",
+        "COMP2402"
+      ],
+      "credits": 0.5,
+      "category": "program",
+      "grade": "N/A",
+      "year": "2",
+      "semester": "Winter",
+      "majorCGPA": true,
+      "completed": false
+    },
+    {
+      "code": "COMP3005",
+      "name": "Database Management Systems",
+      "prereqs": [
+        "COMP1805",
+        "COMP2402"
+      ],
+      "credits": 0.5,
+      "category": "program",
+      "grade": "N/A",
+      "year": "3",
+      "semester": "Fall",
+      "majorCGPA": true,
+      "completed": false
+    },
+    {
+      "code": "COMP3007",
+      "name": "Programming Paradigms",
+      "prereqs": [
+        "COMP1805",
+        "COMP2401",
+        "COMP2406"
+      ],
+      "credits": 0.5,
+      "category": "free",
+      "grade": "N/A",
+      "year": "3",
+      "semester": "Fall",
+      "majorCGPA": true,
+      "completed": false
+    },
+    {
+      "code": "COMP3804",
+      "name": "Design and Analysis of Algorithms I",
+      "prereqs": [
+        "COMP2402",
+        "COMP2804"
+      ],
+      "credits": 0.5,
+      "category": "program",
+      "grade": "N/A",
+      "year": "3",
+      "semester": "Fall",
+      "majorCGPA": true,
+      "completed": false
+    },
+    {
+      "code": "COMP3801",
+      "name": "Algorithms for Modern Data Sets",
+      "prereqs": [
+        "COMP2804"
+      ],
+      "credits": 0.5,
+      "category": "free",
+      "grade": "N/A",
+      "year": "3",
+      "semester": "Fall",
+      "majorCGPA": false,
+      "completed": false
+    },
+    {
+      "code": "COMP3803",
+      "name": "Intro to Theory of Computation",
+      "prereqs": [
+        "COMP2804"
+      ],
+      "credits": 0.5,
+      "category": "free",
+      "grade": "N/A",
+      "year": "3",
+      "semester": "Winter",
+      "majorCGPA": false,
+      "completed": false
+    },
+    {
+      "code": "COMP4804",
+      "name": "Design and Analysis of Algorithms II",
+      "prereqs": [
+        "COMP3804"
+      ],
+      "credits": 0.5,
+      "category": "free",
+      "grade": "N/A",
+      "year": "3",
+      "semester": "Winter",
+      "majorCGPA": false,
+      "completed": false
+    },
+    {
+      "code": "COMP4001",
+      "name": "Distributed Computing",
+      "prereqs": [
+        "COMP1805",
+        "COMP2401",
+        "COMP2406"
+      ],
+      "credits": 0.5,
+      "category": "free",
+      "grade": "N/A",
+      "year": "4",
+      "semester": "Fall",
+      "majorCGPA": false,
+      "completed": false
+    },
+    {
+      "code": "COMP3105",
+      "name": "Introduction to Machine Learning",
+      "prereqs": [
+        "COMP2402",
+        "COMP2404",
+        "COMP2804",
+        "MATH1104"
+      ],
+      "credits": 0.5,
+      "category": "program",
+      "grade": "N/A",
+      "year": "3",
+      "semester": "Fall",
+      "majorCGPA": true,
+      "completed": false
+    },
+    {
+      "code": "COMP4905",
+      "name": "Honours Project",
+      "prereqs": [],
+      "credits": 0.5,
+      "category": "program",
+      "grade": "N/A",
+      "year": "4",
+      "semester": "Fall",
+      "majorCGPA": true,
+      "completed": false
+    },
+    {
+      "code": "COMP3106",
+      "name": "Introduction to Artificial Intelligence",
+      "prereqs": [
+        "COMP2402",
+        "COMP2404",
+        "COMP2804"
+      ],
+      "credits": 0.5,
+      "category": "program",
+      "grade": "N/A",
+      "year": "3",
+      "semester": "Winter",
+      "majorCGPA": true,
+      "completed": false
+    },
+    {
+      "code": "COMP4107",
+      "name": "Neural Networks",
+      "prereqs": [
+        "COMP3105",
+        "MATH1104"
+      ],
+      "credits": 0.5,
+      "category": "program",
+      "grade": "N/A",
+      "year": "4",
+      "semester": "Fall",
+      "majorCGPA": true,
+      "completed": false
+    },
+    {
+      "code": "PHYS1001",
+      "name": "Foundations of Physics I",
+      "prereqs": [],
+      "credits": 0.5,
+      "category": "breadth",
+      "grade": "N/A",
+      "year": "2",
+      "semester": "Fall",
+      "majorCGPA": false,
+      "completed": false
+    },
+    {
+      "code": "PHYS1002",
+      "name": "Foundations of Physics II",
+      "prereqs": [
+        "PHYS1001"
+      ],
+      "credits": 0.5,
+      "category": "breadth",
+      "grade": "N/A",
+      "year": "2",
+      "semester": "Winter",
+      "majorCGPA": false,
+      "completed": false
+    },
+    {
+      "code": "MUSI1107",
+      "name": "Elementary Materials of Music",
+      "prereqs": [],
+      "credits": 0.5,
+      "category": "breadth",
+      "grade": "N/A",
+      "year": "2",
+      "semester": "Fall",
+      "majorCGPA": false,
+      "completed": false
+    },
+    {
+      "code": "MUSI1700",
+      "name": "Foundations of Music Theory",
+      "prereqs": [
+        "MUSI1107"
+      ],
+      "credits": 0.5,
+      "category": "breadth",
+      "grade": "N/A",
+      "year": "2",
+      "semester": "Winter",
+      "majorCGPA": false,
+      "completed": false
+    }
+  ],
+  "requirements": {
+    "totalCreditsRequired": 20,
+    "programCreditsRequired": 11.5,
+    "breadthCreditsRequired": 5,
+    "freeCreditsRequired": 3.5
+  }
+}

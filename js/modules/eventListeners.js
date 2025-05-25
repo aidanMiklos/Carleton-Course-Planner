@@ -20,6 +20,31 @@ export function initializeEventListeners() {
     if (loadCoursesButton) loadCoursesButton.addEventListener('click', () => loadCoursesInput.click());
     if (loadCoursesInput) loadCoursesInput.addEventListener('change', courseService.loadCoursesHandler);
 
+    // Load Aidan's Courses Button (Nav Bar)
+    const loadAidansCoursesButton = domUtils.getElementById('loadAidansCoursesButton');
+    if (loadAidansCoursesButton) {
+        loadAidansCoursesButton.addEventListener('click', async () => {
+            try {
+                const response = await fetch("aidan's courses.json");
+                if (!response.ok) throw new Error('Failed to fetch Aidan\'s courses JSON.');
+                const jsonText = await response.text();
+                // Create a File object to simulate a real file upload
+                const file = new File([jsonText], "aidan's courses.json", { type: 'application/json' });
+                // Simulate a file input event as closely as possible
+                const event = { target: { files: [file] } };
+                courseService.loadCoursesHandler(event);
+                // Show success message
+                const successDiv = document.getElementById('aidanCoursesSuccess');
+                if (successDiv) {
+                    successDiv.style.display = 'block';
+                    setTimeout(() => { successDiv.style.display = 'none'; }, 2000);
+                }
+            } catch (err) {
+                alert('Could not load Aidan\'s courses: ' + err.message);
+            }
+        });
+    }
+
     // Open Requirements Modal Button
     const openReqModalButton = domUtils.getElementById('openRequirementsModalButton');
     if (openReqModalButton) openReqModalButton.addEventListener('click', uiService.openRequirementsModalHandler);
