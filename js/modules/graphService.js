@@ -278,7 +278,7 @@ export function updateGraph() {
     console.log(`updateGraph: Found ${courses.length} courses. Active years:`, Array.from(activeYearNumbers));
 
     // 1. Update or Add Year Nodes
-    const allPossibleYears = [1, 2, 3, 4]; // Or derive from a larger range or actual data
+    const allPossibleYears = [1, 2, 3, 4, 5, 6]; // Now supports up to Year 6
     allPossibleYears.forEach(year => {
         const yearId = `year-${year}`;
         if (activeYearNumbers.has(year)) {
